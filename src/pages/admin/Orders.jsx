@@ -1,0 +1,508 @@
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  ShoppingBag,
+  Search,
+  Filter,
+  Eye,
+  CheckCircle,
+  Clock,
+  X,
+  CreditCard,
+  User,
+  MapPin,
+  Calendar,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import { collection, onSnapshot, doc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../../firebase/firebase";
+import { dummyOrders } from "../../assets/keralaData";
+import toast from "react-hot-toast";
+
+// Curated status colors matching the theme
+const STATUS_COLORS = {
+  placed: "bg-blue-100 text-blue-700 border-blue-200",
+  confirmed: "bg-purple-100 text-purple-700 border-purple-200",
+  processing: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  packed: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  shipped: "bg-pink-100 text-pink-700 border-pink-200",
+  "out-for-delivery": "bg-orange-100 text-orange-700 border-orange-200",
+  delivered: "bg-green-100 text-green-700 border-green-200",
+  cancelled: "bg-red-100 text-red-700 border-red-200",
+};
+
+const ORDER_STATUS_FLOW = [
+  "placed",
+  "confirmed",
+  "processing",
+  "packed",
+  "shipped",
+  "out-for-delivery",
+  "delivered",
+  "cancelled",
+];
+
+const Orders = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Load orders in real-time, auto-seed if empty
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "orders"), async (snapshot) => {
+      if (snapshot.empty) {
+        console.log("Seeding mock orders into Firestore...");
+        try {
+          for (const o of dummyOrders) {
+            await setDoc(doc(db, "orders", o.id), {
+              ...o,
+              createdAt: o.createdAt || new Date().toISOString(),
+              updatedAt: o.updatedAt || new Date().toISOString(),
+            });
+          }
+        } catch (err) {
+          console.error("Mock orders seeding failed:", err);
+        }
+      } else {
+        const orderList = [];
+        snapshot.forEach((doc) => {
+          orderList.push({ ...doc.data(), id: doc.id });
+        });
+        // Sort orders by date descending
+        orderList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setOrders(orderList);
+      }
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, []);
+
+  // Filter orders
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const matchSearch =
+        order.id.toLowerCase().includes(search.toLowerCase()) ||
+        order.address?.fullName.toLowerCase().includes(search.toLowerCase()) ||
+        order.address?.city.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = statusFilter === "all" || order.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [orders, search, statusFilter]);
+
+  // Update order status
+  const handleUpdateStatus = async (orderId, newStatus) => {
+    setUpdatingStatus(true);
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Update selected order view
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
+      }
+      toast.success(`Order status updated to "${newStatus.replace(/-/g, " ")}"`);
+    } catch (err) {
+      console.error("Update order status error:", err);
+      toast.error("Failed to update status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // Toggle payment status
+  const handleTogglePayment = async (orderId, currentStatus) => {
+    const nextStatus = currentStatus === "paid" ? "pending" : "paid";
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        paymentStatus: nextStatus,
+        updatedAt: new Date().toISOString(),
+      });
+
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) => ({ ...prev, paymentStatus: nextStatus }));
+      }
+      toast.success(`Payment status marked as ${nextStatus.toUpperCase()}`);
+    } catch (err) {
+      console.error("Toggle payment status error:", err);
+      toast.error("Failed to update payment status");
+    }
+  };
+
+  // Helpers
+  const formatINR = (amount) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
+        <p className="text-gray-500 text-sm mt-0.5">
+          {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""} found
+        </p>
+      </div>
+
+      {/* Filter strip */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col md:flex-row gap-4">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search Order ID, customer name, or city…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"
+          />
+        </div>
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+              statusFilter === "all" ? "bg-[#1B6B3A] text-white" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            All Orders
+          </button>
+          {ORDER_STATUS_FLOW.map((status) => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize whitespace-nowrap cursor-pointer transition-colors ${
+                statusFilter === status
+                  ? "bg-[#1B6B3A] text-white"
+                  : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              {status.replace(/-/g, " ")}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Orders Table */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+          <Loader2 size={36} className="animate-spin text-[#1B6B3A] mb-3" />
+          <p className="text-sm font-medium">Fetching orders...</p>
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 bg-white border border-gray-100 rounded-2xl text-gray-400">
+          <ShoppingBag size={40} className="mb-3 opacity-40" />
+          <p className="font-medium">No orders matching the filters</p>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide border-b border-gray-100">
+                  <th className="text-left px-5 py-3.5 font-semibold">Order ID</th>
+                  <th className="text-left px-5 py-3.5 font-semibold">Customer</th>
+                  <th className="text-left px-5 py-3.5 font-semibold hidden md:table-cell">Date</th>
+                  <th className="text-left px-5 py-3.5 font-semibold">Amount</th>
+                  <th className="text-center px-5 py-3.5 font-semibold">Status</th>
+                  <th className="text-left px-5 py-3.5 font-semibold hidden sm:table-cell">Payment</th>
+                  <th className="text-right px-5 py-3.5 font-semibold">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredOrders.map((order) => {
+                  const statusColor = STATUS_COLORS[order.status] || "bg-gray-100 text-gray-600";
+                  return (
+                    <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                      {/* ID */}
+                      <td className="px-5 py-4 font-mono font-bold text-gray-700 text-xs">
+                        #{order.id.replace("order_", "").toUpperCase()}
+                      </td>
+
+                      {/* Customer info */}
+                      <td className="px-5 py-4">
+                        <div className="min-w-[120px]">
+                          <p className="font-semibold text-gray-800 leading-snug">
+                            {order.address?.fullName || "Guest Customer"}
+                          </p>
+                          <p className="text-gray-400 text-xs mt-0.5">
+                            {order.address?.city}, {order.address?.pincode}
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* Date */}
+                      <td className="px-5 py-4 text-gray-500 text-xs hidden md:table-cell whitespace-nowrap">
+                        {formatDate(order.createdAt)}
+                      </td>
+
+                      {/* Total Amount */}
+                      <td className="px-5 py-4 font-bold text-gray-800">
+                        {formatINR(order.amount)}
+                      </td>
+
+                      {/* Status badge */}
+                      <td className="px-5 py-4 text-center">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize border ${statusColor}`}
+                        >
+                          {order.status.replace(/-/g, " ")}
+                        </span>
+                      </td>
+
+                      {/* Payment Method / Status */}
+                      <td className="px-5 py-4 hidden sm:table-cell">
+                        <div>
+                          <span className="text-xs uppercase font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                            {order.paymentMethod}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePayment(order.id, order.paymentStatus)}
+                            className={`block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer ${
+                              order.paymentStatus === "paid"
+                                ? "bg-green-50 text-green-700"
+                                : "bg-red-50 text-red-600 hover:bg-red-100"
+                            }`}
+                          >
+                            {order.paymentStatus.toUpperCase()}
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* View Action */}
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          onClick={() => setSelectedOrder(order)}
+                          className="p-1.5 bg-gray-50 hover:bg-[#1B6B3A]/10 hover:text-[#1B6B3A] text-gray-400 rounded-lg transition-colors cursor-pointer"
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Order Detail Slide-Over Modal ── */}
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 p-0 animate-fade-in">
+          {/* Overlay Dismissal */}
+          <div className="absolute inset-0 cursor-pointer" onClick={() => setSelectedOrder(null)} />
+
+          {/* Slide-over panel */}
+          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col justify-between overflow-hidden animate-slide-in-right">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <div>
+                <span className="text-xs font-bold text-gray-400 uppercase font-mono">
+                  Order ID
+                </span>
+                <h2 className="font-bold text-gray-800 text-lg leading-tight">
+                  #{selectedOrder.id.replace("order_", "").toUpperCase()}
+                </h2>
+              </div>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              {/* Order Status Controller */}
+              <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                    <Clock size={13} />
+                    Current Status:
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border ${
+                      STATUS_COLORS[selectedOrder.status] || "bg-gray-100"
+                    }`}
+                  >
+                    {selectedOrder.status.replace(/-/g, " ")}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-400 uppercase">
+                    Update Progress State
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedOrder.status}
+                      disabled={updatingStatus}
+                      onChange={(e) => handleUpdateStatus(selectedOrder.id, e.target.value)}
+                      className="flex-1 px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white cursor-pointer"
+                    >
+                      {ORDER_STATUS_FLOW.map((s) => (
+                        <option key={s} value={s}>
+                          Change to: {s.toUpperCase().replace(/-/g, " ")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-50 pb-1 flex items-center gap-1.5">
+                  <User size={13} />
+                  Delivery & Contact
+                </h3>
+                <div className="bg-white border border-gray-100 rounded-xl p-3.5 space-y-2">
+                  <p className="font-semibold text-gray-800 text-sm">
+                    {selectedOrder.address?.fullName}
+                  </p>
+                  <p className="text-xs text-gray-600 flex items-center gap-1">
+                    📞 {selectedOrder.address?.phone}
+                  </p>
+                  <div className="text-xs text-gray-500 flex items-start gap-1 mt-1">
+                    <MapPin size={13} className="text-gray-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      {selectedOrder.address?.addressLine1},<br />
+                      {selectedOrder.address?.addressLine2 && `${selectedOrder.address.addressLine2}, `}
+                      {selectedOrder.address?.city}, {selectedOrder.address?.state} -{" "}
+                      <span className="font-semibold">{selectedOrder.address?.pincode}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-50 pb-1 flex items-center gap-1.5">
+                  <ShoppingBag size={13} />
+                  Ordered Items ({selectedOrder.items?.length || 0})
+                </h3>
+                <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                  {selectedOrder.items?.map((item, index) => (
+                    <div key={index} className="bg-white p-3 flex justify-between items-center gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-800 leading-snug">
+                          {item.name}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          {item.qty} units × {formatINR(item.sellingPrice)}
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-gray-800">
+                        {formatINR(item.qty * item.sellingPrice)}
+                      </span>
+                    </div>
+                  ))}
+                  {/* Summary amount row */}
+                  <div className="bg-gray-50/50 p-3 flex justify-between items-center border-t border-gray-100">
+                    <span className="text-xs font-semibold text-gray-500">Subtotal Amount</span>
+                    <span className="text-sm font-extrabold text-[#1B6B3A]">
+                      {formatINR(selectedOrder.amount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Details */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-50 pb-1 flex items-center gap-1.5">
+                  <CreditCard size={13} />
+                  Payment Summary
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white border border-gray-100 rounded-xl p-3 flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Method</span>
+                    <span className="text-xs font-bold text-gray-800 uppercase mt-1">
+                      {selectedOrder.paymentMethod === "cod"
+                        ? "🤝 Cash On Delivery (COD)"
+                        : `💳 Card / Razorpay`}
+                    </span>
+                  </div>
+                  <div className="bg-white border border-gray-100 rounded-xl p-3 flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Status</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span
+                        className={`text-xs font-extrabold capitalize ${
+                          selectedOrder.paymentStatus === "paid" ? "text-green-600" : "text-red-500"
+                        }`}
+                      >
+                        {selectedOrder.paymentStatus}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleTogglePayment(selectedOrder.id, selectedOrder.paymentStatus)
+                        }
+                        className="text-[10px] text-[#1B6B3A] hover:underline font-semibold cursor-pointer"
+                      >
+                        Toggle Status
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Meta information */}
+              <div className="border-t border-gray-50 pt-4 flex items-center gap-4 text-[10px] text-gray-400">
+                <span className="flex items-center gap-1">
+                  <Calendar size={11} />
+                  Placed: {formatDate(selectedOrder.createdAt)}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer actions */}
+            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center gap-3 flex-shrink-0">
+              {selectedOrder.status !== "delivered" && selectedOrder.status !== "cancelled" ? (
+                <button
+                  onClick={() => handleUpdateStatus(selectedOrder.id, "delivered")}
+                  className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle size={14} />
+                  Mark as Delivered
+                </button>
+              ) : null}
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="flex-1 py-2 px-4 bg-white border border-gray-200 text-gray-600 text-xs font-bold rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Close View
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Orders;
