@@ -23,9 +23,10 @@ const TABS = ["Personal Info", "My Addresses", "Quick Links"];
 
 const Profile = () => {
   const { user, logout, navigate } = useAppContext();
+  const displayUser = user && !user.isStaff ? user : null;
 
   const [activeTab, setActiveTab] = useState(0);
-  const [phone, setPhone] = useState(user?.phoneNumber || "");
+  const [phone, setPhone] = useState(displayUser?.phoneNumber || "");
   const [phoneEditing, setPhoneEditing] = useState(false);
   const [savingPhone, setSavingPhone] = useState(false);
 
@@ -58,7 +59,7 @@ const Profile = () => {
     }
   };
 
-  if (!user) {
+  if (!displayUser) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center">
         <p className="text-gray-500 mb-4">Please log in to view your profile.</p>
@@ -85,30 +86,30 @@ const Profile = () => {
 
         <div className="px-6 pb-6 -mt-12 flex flex-col sm:flex-row sm:items-end gap-4">
           {/* Avatar */}
-          {user.photoURL ? (
+          {displayUser.photoURL ? (
             <img
-              src={user.photoURL}
-              alt={user.displayName}
+              src={displayUser.photoURL}
+              alt={displayUser.displayName}
               className="w-24 h-24 rounded-full border-4 border-white shadow-lg flex-shrink-0"
             />
           ) : (
             <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-primary flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-2xl">
-                {getInitials(user.displayName || user.email)}
+                {getInitials(displayUser.displayName || displayUser.email)}
               </span>
             </div>
           )}
 
           <div className="flex-1 min-w-0 sm:mb-1">
             <h1 className="text-xl font-bold text-dark">
-              {user.displayName || "Kerala Yard User"}
+              {displayUser.displayName || "Kerala Yard User"}
             </h1>
-            <p className="text-gray-500 text-sm">{user.email}</p>
+            <p className="text-gray-500 text-sm">{displayUser.email}</p>
             <p className="text-gray-400 text-xs mt-0.5 flex items-center gap-1">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
               </svg>
-              {getMemberSince(user)}
+              {getMemberSince(displayUser)}
             </p>
           </div>
 
@@ -162,7 +163,7 @@ const Profile = () => {
                   <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                   </svg>
-                  <span className="text-dark font-medium">{user.displayName || "—"}</span>
+                  <span className="text-dark font-medium">{displayUser.displayName || "—"}</span>
                   <span className="ml-auto text-[10px] bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">Google Account</span>
                 </div>
               </div>
@@ -176,7 +177,7 @@ const Profile = () => {
                   <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                   </svg>
-                  <span className="text-dark font-medium">{user.email}</span>
+                  <span className="text-dark font-medium">{displayUser.email}</span>
                   <span className="ml-auto text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">Verified</span>
                 </div>
               </div>

@@ -80,7 +80,8 @@ const ConfirmDialog = ({ isOpen, productName, onConfirm, onCancel }) => {
 // ─────────────────────────────────────────────────────────────
 const Products = () => {
   const navigate = useNavigate();
-  const { products, categories } = useAppContext();
+  const { products, categories, user } = useAppContext();
+  const isEmployee = user?.role === "employee";
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
@@ -107,6 +108,9 @@ const Products = () => {
 
   // Toggle featured
   const toggleFeatured = async (id) => {
+    if (isEmployee) {
+      return toast.error("Access denied. Employees have view-only catalog rights.");
+    }
     const prod = products.find((p) => p.id === id);
     if (!prod) return;
     try {
@@ -120,6 +124,9 @@ const Products = () => {
 
   // Toggle active
   const toggleActive = async (id) => {
+    if (isEmployee) {
+      return toast.error("Access denied. Employees have view-only catalog rights.");
+    }
     const prod = products.find((p) => p.id === id);
     if (!prod) return;
     try {
@@ -161,15 +168,33 @@ const Products = () => {
             {filtered.length} product{filtered.length !== 1 ? "s" : ""} found
           </p>
         </div>
-        <button
-          onClick={() => navigate("/admin/products/add")}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-95"
-          style={{ backgroundColor: "#1B6B3A" }}
-        >
-          <Plus size={17} />
-          Add Product
-        </button>
+        {!isEmployee && (
+          <button
+            onClick={() => navigate("/admin/products/add")}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-95"
+            style={{ backgroundColor: "#1B6B3A" }}
+          >
+            <Plus size={17} />
+            Add Product
+          </button>
+        )}
       </div>
+
+      {/* Role Restriction Banner */}
+      {isEmployee && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-3 items-start">
+          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 text-orange-600">
+            ⚠️
+          </div>
+          <div>
+            <h4 className="font-semibold text-orange-950 text-sm">Employee View-Only Products Catalog</h4>
+            <p className="text-orange-800 text-xs mt-0.5 leading-relaxed">
+              Your account has view-only catalog clearance. You can browse all store items and inspect stock numbers,
+              but cannot create new listings, edit active details, toggle product statuses, or delete inventory records.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row gap-3">
@@ -337,26 +362,30 @@ const Products = () => {
 
                     {/* Actions */}
                     <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() =>
-                            navigate(`/admin/products/edit/${product.id}`)
-                          }
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                          title="Edit"
-                        >
-                          <Edit size={15} />
-                        </button>
-                        <button
-                          onClick={() =>
-                            setDeleteTarget({ id: product.id, name: product.name })
-                          }
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
+                      {!isEmployee ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() =>
+                              navigate(`/admin/products/edit/${product.id}`)
+                            }
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="Edit"
+                          >
+                            <Edit size={15} />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setDeleteTarget({ id: product.id, name: product.name })
+                            }
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400 font-medium">Read-Only</span>
+                      )}
                     </td>
                   </tr>
                 ))}

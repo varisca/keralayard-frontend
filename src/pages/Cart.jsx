@@ -22,6 +22,8 @@ const Cart = () => {
     currency,
   } = useAppContext();
 
+  const displayUser = user && !user.isStaff ? user : null;
+
   // Use keralaData products as source-of-truth
   const allProducts = products.length > 0 ? products : dummyProducts;
 
@@ -42,12 +44,12 @@ const Cart = () => {
 
   // ── Load addresses from Firestore or fall back to dummyAddresses ───────────
   const loadAddresses = useCallback(async () => {
-    if (!user) return;
+    if (!displayUser) return;
     setAddressLoading(true);
     try {
       const q = query(
         collection(db, "addresses"),
-        where("userId", "==", user.uid)
+        where("userId", "==", displayUser.uid)
       );
       const snap = await getDocs(q);
       if (!snap.empty) {
@@ -67,7 +69,7 @@ const Cart = () => {
     } finally {
       setAddressLoading(false);
     }
-  }, [user]);
+  }, [displayUser]);
 
   useEffect(() => {
     loadAddresses();
@@ -85,7 +87,7 @@ const Cart = () => {
       toast.error("Please select a delivery address");
       return;
     }
-    if (!user) {
+    if (!displayUser) {
       setShowUserLogin(true);
       return;
     }

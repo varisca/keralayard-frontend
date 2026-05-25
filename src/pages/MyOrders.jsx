@@ -297,13 +297,14 @@ const HistoryOrderCard = ({ order, currency }) => {
 // ── Main Component ────────────────────────────────────────────────────────
 const MyOrders = () => {
   const { user, currency, navigate } = useAppContext();
+  const displayUser = user && !user.isStaff ? user : null;
 
   // Use dummyOrders as initial state (Firebase is placeholder)
   const [orders, setOrders] = useState(dummyOrders);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!displayUser) {
       // Still show demo orders for unauthenticated preview
       setOrders(dummyOrders);
       setLoading(false);
@@ -315,7 +316,7 @@ const MyOrders = () => {
     try {
       const q = query(
         collection(db, "orders"),
-        where("userId", "==", user.uid)
+        where("userId", "==", displayUser.uid)
       );
       unsubscribe = onSnapshot(
         q,
@@ -350,7 +351,7 @@ const MyOrders = () => {
     }
 
     return () => unsubscribe();
-  }, [user]);
+  }, [displayUser]);
 
   // Split orders by active vs history
   const activeOrders = orders.filter((o) => {

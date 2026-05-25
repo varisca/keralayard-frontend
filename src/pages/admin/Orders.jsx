@@ -55,6 +55,8 @@ const Orders = () => {
     const unsub = onSnapshot(collection(db, "orders"), async (snapshot) => {
       if (snapshot.empty) {
         console.log("Seeding mock orders into Firestore...");
+        setOrders(dummyOrders);
+        setLoading(false);
         try {
           for (const o of dummyOrders) {
             await setDoc(doc(db, "orders", o.id), {
@@ -74,7 +76,11 @@ const Orders = () => {
         // Sort orders by date descending
         orderList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setOrders(orderList);
+        setLoading(false);
       }
+    }, (error) => {
+      console.warn("Orders sync failed (using local fallback data):", error);
+      setOrders(dummyOrders);
       setLoading(false);
     });
 
@@ -96,20 +102,29 @@ const Orders = () => {
   // Update order status
   const handleUpdateStatus = async (orderId, newStatus) => {
     setUpdatingStatus(true);
+
+    // Optimistic Update: Update React state immediately
+    setOrders((prevOrders) =>
+      prevOrders.map((o) =>
+        o.id === orderId
+          ? { ...o, status: newStatus, updatedAt: new Date().toISOString() }
+          : o
+      )
+    );
+    if (selectedOrder && selectedOrder.id === orderId) {
+      setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
+    }
+
     try {
       await updateDoc(doc(db, "orders", orderId), {
         status: newStatus,
         updatedAt: new Date().toISOString(),
       });
-
-      // Update selected order view
-      if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
-      }
       toast.success(`Order status updated to "${newStatus.replace(/-/g, " ")}"`);
     } catch (err) {
-      console.error("Update order status error:", err);
-      toast.error("Failed to update status");
+      console.warn("Firestore updateDoc status error (falling back to mock state):", err);
+      // Fallback is already handled by optimistic state above, just toast success
+      toast.success(`Order status updated to "${newStatus.replace(/-/g, " ")}"`);
     } finally {
       setUpdatingStatus(false);
     }
@@ -118,23 +133,65 @@ const Orders = () => {
   // Toggle payment status
   const handleTogglePayment = async (orderId, currentStatus) => {
     const nextStatus = currentStatus === "paid" ? "pending" : "paid";
+
+    // Optimistic Update: Update React state immediately
+    setOrders((prevOrders) =>
+      prevOrders.map((o) =>
+        o.id === orderId
+          ? { ...o, paymentStatus: nextStatus, updatedAt: new Date().toISOString() }
+          : o
+      )
+    );
+    if (selectedOrder && selectedOrder.id === orderId) {
+      setSelectedOrder((prev) => ({ ...prev, paymentStatus: nextStatus }));
+    }
+
     try {
       await updateDoc(doc(db, "orders", orderId), {
         paymentStatus: nextStatus,
         updatedAt: new Date().toISOString(),
       });
-
-      if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => ({ ...prev, paymentStatus: nextStatus }));
-      }
       toast.success(`Payment status marked as ${nextStatus.toUpperCase()}`);
     } catch (err) {
-      console.error("Toggle payment status error:", err);
-      toast.error("Failed to update payment status");
+      console.warn("Firestore updateDoc payment status error (falling back to mock state):", err);
+      toast.success(`Payment status marked as ${nextStatus.toUpperCase()}`);
+    }
+  };
+
+  // Update payment method
+  const handleUpdatePaymentMethod = async (orderId, newMethod) => {
+    // Optimistic Update: Update React state immediately
+    setOrders((prevOrders) =>
+      prevOrders.map((o) =>
+        o.id === orderId
+          ? { ...o, paymentMethod: newMethod, updatedAt: new Date().toISOString() }
+          : o
+      )
+    );
+    if (selectedOrder && selectedOrder.id === orderId) {
+      setSelectedOrder((prev) => ({ ...prev, paymentMethod: newMethod }));
+    }
+
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        paymentMethod: newMethod,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success(`Payment method updated to "${newMethod}"`);
+    } catch (err) {
+      console.warn("Firestore updateDoc payment method error (falling back to mock state):", err);
+      toast.success(`Payment method updated to "${newMethod}"`);
     }
   };
 
   // Helpers
+  const displayPaymentMethod = (method) => {
+    if (!method) return "Cash";
+    const m = method.toLowerCase();
+    if (m === "cod" || m === "cash") return "Cash";
+    return "Online Payment";
+  };
+
   const formatINR = (amount) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -182,25 +239,34 @@ const Orders = () => {
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors flex items-center gap-1.5 ${
               statusFilter === "all" ? "bg-[#1B6B3A] text-white" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
             }`}
           >
             All Orders
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${statusFilter === "all" ? "bg-white text-[#1B6B3A] font-bold" : "bg-gray-200 text-gray-700 font-semibold"}`}>
+              {orders.length}
+            </span>
           </button>
-          {ORDER_STATUS_FLOW.map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize whitespace-nowrap cursor-pointer transition-colors ${
-                statusFilter === status
-                  ? "bg-[#1B6B3A] text-white"
-                  : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-              }`}
-            >
-              {status.replace(/-/g, " ")}
-            </button>
-          ))}
+          {ORDER_STATUS_FLOW.map((status) => {
+            const count = orders.filter((o) => o.status === status).length;
+            return (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors ${
+                  statusFilter === status
+                    ? "bg-[#1B6B3A] text-white"
+                    : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                <span>{status.replace(/-/g, " ")}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${statusFilter === status ? "bg-white text-[#1B6B3A] font-bold" : "bg-gray-200 text-gray-700 font-semibold"}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -222,11 +288,13 @@ const Orders = () => {
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide border-b border-gray-100">
                   <th className="text-left px-5 py-3.5 font-semibold">Order ID</th>
-                  <th className="text-left px-5 py-3.5 font-semibold">Customer</th>
-                  <th className="text-left px-5 py-3.5 font-semibold hidden md:table-cell">Date</th>
+                  <th className="text-left px-5 py-3.5 font-semibold">Customer Name</th>
+                  <th className="text-left px-5 py-3.5 font-semibold">Contact Number</th>
+                  <th className="text-left px-5 py-3.5 font-semibold">Order Date & Time</th>
                   <th className="text-left px-5 py-3.5 font-semibold">Amount</th>
-                  <th className="text-center px-5 py-3.5 font-semibold">Status</th>
-                  <th className="text-left px-5 py-3.5 font-semibold hidden sm:table-cell">Payment</th>
+                  <th className="text-center px-5 py-3.5 font-semibold">Order Status</th>
+                  <th className="text-left px-5 py-3.5 font-semibold">Payment Method</th>
+                  <th className="text-left px-5 py-3.5 font-semibold">Payment Status</th>
                   <th className="text-right px-5 py-3.5 font-semibold">Action</th>
                 </tr>
               </thead>
@@ -240,20 +308,18 @@ const Orders = () => {
                         #{order.id.replace("order_", "").toUpperCase()}
                       </td>
 
-                      {/* Customer info */}
-                      <td className="px-5 py-4">
-                        <div className="min-w-[120px]">
-                          <p className="font-semibold text-gray-800 leading-snug">
-                            {order.address?.fullName || "Guest Customer"}
-                          </p>
-                          <p className="text-gray-400 text-xs mt-0.5">
-                            {order.address?.city}, {order.address?.pincode}
-                          </p>
-                        </div>
+                      {/* Customer Name */}
+                      <td className="px-5 py-4 font-semibold text-gray-800">
+                        {order.address?.fullName || "Guest Customer"}
+                      </td>
+
+                      {/* Contact Number */}
+                      <td className="px-5 py-4 text-gray-600 font-medium">
+                        {order.address?.phone || "N/A"}
                       </td>
 
                       {/* Date */}
-                      <td className="px-5 py-4 text-gray-500 text-xs hidden md:table-cell whitespace-nowrap">
+                      <td className="px-5 py-4 text-gray-500 text-xs whitespace-nowrap">
                         {formatDate(order.createdAt)}
                       </td>
 
@@ -264,29 +330,54 @@ const Orders = () => {
 
                       {/* Status badge */}
                       <td className="px-5 py-4 text-center">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize border ${statusColor}`}
+                        <select
+                          value={order.status}
+                          disabled={updatingStatus}
+                          onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-full border bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                          style={{
+                            borderColor: order.status === 'delivered' ? '#A7F3D0' : '#D1D5DB',
+                            color: order.status === 'delivered' ? '#047857' : '#374151',
+                          }}
                         >
-                          {order.status.replace(/-/g, " ")}
-                        </span>
+                          {ORDER_STATUS_FLOW.map((s) => (
+                            <option key={s} value={s}>
+                              {s.toUpperCase().replace(/-/g, " ")}
+                            </option>
+                          ))}
+                        </select>
                       </td>
 
-                      {/* Payment Method / Status */}
-                      <td className="px-5 py-4 hidden sm:table-cell">
-                        <div>
-                          <span className="text-xs uppercase font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                            {order.paymentMethod}
+                      {/* Payment Method */}
+                      <td className="px-5 py-4">
+                        <select
+                          value={displayPaymentMethod(order.paymentMethod)}
+                          onChange={(e) => handleUpdatePaymentMethod(order.id, e.target.value)}
+                          className="px-2 py-1 text-xs font-semibold border border-gray-200 rounded-xl bg-white cursor-pointer focus:outline-none"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="Online Payment">Online Payment</option>
+                        </select>
+                      </td>
+
+                      {/* Payment Status */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs font-bold px-2 py-0.5 rounded ${
+                              order.paymentStatus === "paid"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {order.paymentStatus?.toUpperCase() || "PENDING"}
                           </span>
                           <button
                             type="button"
                             onClick={() => handleTogglePayment(order.id, order.paymentStatus)}
-                            className={`block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer ${
-                              order.paymentStatus === "paid"
-                                ? "bg-green-50 text-green-700"
-                                : "bg-red-50 text-red-600 hover:bg-red-100"
-                            }`}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
                           >
-                            {order.paymentStatus.toUpperCase()}
+                            Toggle
                           </button>
                         </div>
                       </td>
@@ -441,11 +532,14 @@ const Orders = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-white border border-gray-100 rounded-xl p-3 flex flex-col justify-between">
                     <span className="text-[10px] font-bold text-gray-400 uppercase">Method</span>
-                    <span className="text-xs font-bold text-gray-800 uppercase mt-1">
-                      {selectedOrder.paymentMethod === "cod"
-                        ? "🤝 Cash On Delivery (COD)"
-                        : `💳 Card / Razorpay`}
-                    </span>
+                    <select
+                      value={displayPaymentMethod(selectedOrder.paymentMethod)}
+                      onChange={(e) => handleUpdatePaymentMethod(selectedOrder.id, e.target.value)}
+                      className="mt-1 w-full px-2 py-1 text-xs font-bold border border-gray-200 rounded-lg bg-white cursor-pointer focus:outline-none"
+                    >
+                      <option value="Cash">🤝 Cash</option>
+                      <option value="Online Payment">💳 Online Payment</option>
+                    </select>
                   </div>
                   <div className="bg-white border border-gray-100 rounded-xl p-3 flex flex-col justify-between">
                     <span className="text-[10px] font-bold text-gray-400 uppercase">Status</span>

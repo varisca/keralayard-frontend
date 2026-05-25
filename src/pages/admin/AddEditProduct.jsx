@@ -34,7 +34,14 @@ const Toggle = ({ checked, onChange, activeColor = "#1B6B3A" }) => (
 const AddEditProduct = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { categories, categoriesLoading } = useAppContext();
+  const { categories, categoriesLoading, user } = useAppContext();
+
+  useEffect(() => {
+    if (user?.role === "employee") {
+      toast.error("Access denied. Employees have view-only catalog rights.");
+      navigate("/admin/products");
+    }
+  }, [user, navigate]);
 
   const isEditMode = !!id;
 
@@ -42,7 +49,7 @@ const AddEditProduct = () => {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [categoryId, setCategoryId] = useState("cat_general");
   const [mrp, setMrp] = useState("");
   const [sellingPrice, setSellingPrice] = useState("");
   const [stock, setStock] = useState("");
@@ -85,7 +92,7 @@ const AddEditProduct = () => {
           setName(data.name || "");
           setSlug(data.slug || "");
           setDescription(data.description || "");
-          setCategoryId(data.categoryId || "");
+          setCategoryId(data.categoryId || "cat_general");
           setMrp(data.mrp !== undefined ? data.mrp.toString() : "");
           setSellingPrice(data.sellingPrice !== undefined ? data.sellingPrice.toString() : "");
           setStock(data.stock !== undefined ? data.stock.toString() : "");
@@ -141,13 +148,11 @@ const AddEditProduct = () => {
 
     if (!name.trim()) return toast.error("Product name is required");
     if (!slug.trim()) return toast.error("Slug is required");
-    if (!categoryId) return toast.error("Please select a category");
     if (!sellingPrice) return toast.error("Selling price is required");
     if (!stock) return toast.error("Stock quantity is required");
     if (!weight.trim()) return toast.error("Weight/volume is required (e.g. 500g)");
 
-    const selectedCategory = categories.find((c) => c.id === categoryId);
-    if (!selectedCategory) return toast.error("Selected category is invalid");
+    const selectedCategory = (categories && categories.find((c) => c.id === categoryId)) || { id: "cat_general", name: "General" };
 
     setSaving(true);
     try {
@@ -163,7 +168,7 @@ const AddEditProduct = () => {
         name: name.trim(),
         slug: slug.trim(),
         description: description.trim(),
-        categoryId,
+        categoryId: selectedCategory.id,
         categoryName: selectedCategory.name,
         images: images.length > 0 ? images : [null],
         mrp: parseFloat(mrp) || parseFloat(sellingPrice),
@@ -409,28 +414,23 @@ const AddEditProduct = () => {
               Categorization
             </h2>
 
-            {/* Select Category */}
+            {/* Category selection */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                Select Category
+              <label className="text-xs font-bold text-gray-500 uppercase block">
+                Product Category
               </label>
-              {categoriesLoading ? (
-                <div className="text-xs text-gray-400 py-1.5">Loading categories...</div>
-              ) : (
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white cursor-pointer"
-                  required
-                >
-                  <option value="">Choose a category</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.icon} {c.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white cursor-pointer"
+              >
+                <option value="cat_general">General / No Category</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.icon || "🥥"} {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Search Tags */}

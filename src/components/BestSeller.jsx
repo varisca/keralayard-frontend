@@ -104,7 +104,8 @@ const BestSeller = () => {
 
   // Use context products (same as dummyProducts) or fallback
   const source = products && products.length > 0 ? products : dummyProducts
-  const featured = source.filter((p) => p.featured).slice(0, 8)
+  // Only show active and featured products
+  const featured = source.filter((p) => p.active !== false && p.featured).slice(0, 8)
 
   return (
     <section className="mt-16">

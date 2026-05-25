@@ -103,7 +103,8 @@ const PopularProducts = () => {
   const { products } = useAppContext()
 
   const source = products && products.length > 0 ? products : dummyProducts
-  const popular = source.slice(0, 8)
+  // Only show active products on storefront
+  const popular = source.filter((p) => p.active !== false).slice(0, 8)
 
   return (
     <section className="mt-16">

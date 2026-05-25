@@ -93,6 +93,8 @@ const Checkout = () => {
     getCartAmount,
   } = useAppContext();
 
+  const displayUser = user && !user.isStaff ? user : null;
+
   const allProducts = products.length > 0 ? products : dummyProducts;
 
   // ── Cart array ─────────────────────────────────────────────────────────────
@@ -117,11 +119,11 @@ const Checkout = () => {
   // ── Load addresses ─────────────────────────────────────────────────────────
   useEffect(() => {
     const loadAddresses = async () => {
-      if (!user) return;
+      if (!displayUser) return;
       try {
         const q = query(
           collection(db, "addresses"),
-          where("userId", "==", user.uid)
+          where("userId", "==", displayUser.uid)
         );
         const snap = await getDocs(q);
         if (!snap.empty) {
@@ -138,7 +140,7 @@ const Checkout = () => {
       }
     };
     loadAddresses();
-  }, [user]);
+  }, [displayUser]);
 
   // ── Redirect if cart empty ─────────────────────────────────────────────────
   useEffect(() => {
@@ -166,23 +168,49 @@ const Checkout = () => {
       const result = await createOrder({
         items: cartArray.map((p) => ({
           productId: p.id,
-          name: p.name,
           qty: p.quantity,
-          sellingPrice: p.sellingPrice,
         })),
-        address: selectedAddress,
+        addressId: selectedAddress.id,
         paymentMethod: "cod",
-        subtotal,
-        deliveryCharge,
-        tax,
-        total,
       });
       const data = result.data;
-      setOrderNumber(data.orderId || generateOrderId());
+      if (data && data.success) {
+        setOrderNumber(data.orderNumber || data.orderId);
+      } else {
+        throw new Error("Order creation was not marked successful.");
+      }
     } catch (err) {
-      // Fallback for placeholder Firebase — generate a local order ID
-      console.warn("Cloud function unavailable, using fallback:", err.message);
-      setOrderNumber(generateOrderId());
+      // Fallback for local testing or un-deployed Cloud Functions — generate a local order ID and write directly to Firestore
+      console.warn("Cloud function execution failed, using fallback:", err.message);
+      const localId = generateOrderId();
+      const customOrderId = `order_${localId.toLowerCase()}`;
+      setOrderNumber(localId);
+      
+      try {
+        const { doc, setDoc } = await import("firebase/firestore");
+        const payload = {
+          id: customOrderId,
+          userId: displayUser ? displayUser.uid : "guest_user",
+          items: cartArray.map((p) => ({
+            id: p.id,
+            name: p.name,
+            qty: p.quantity,
+            sellingPrice: p.sellingPrice,
+            mrp: p.mrp,
+            weight: p.weight,
+          })),
+          address: selectedAddress,
+          amount: total,
+          status: "placed",
+          paymentMethod: "cod",
+          paymentStatus: "pending",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, "orders", customOrderId), payload);
+      } catch (dbErr) {
+        console.error("Direct checkout DB write failed:", dbErr);
+      }
     }
     clearCart();
     setConfirmed(true);

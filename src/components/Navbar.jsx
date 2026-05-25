@@ -14,6 +14,8 @@ const Navbar = () => {
   const { user, logout, setShowUserLogin, getCartCount, cartItems } = useAppContext();
   const navigate = useNavigate();
 
+  const displayUser = user && !user.isStaff ? user : null;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -62,7 +64,7 @@ const Navbar = () => {
   const activeLinkClass = ({ isActive }) =>
     `text-sm font-medium transition-colors duration-200 pb-0.5 ${
       isActive
-        ? 'text-[#1B6B3A] border-b-2 border-[#D4A017]'
+         ? 'text-[#1B6B3A] border-b-2 border-[#D4A017]'
         : 'text-gray-600 hover:text-[#1B6B3A]'
     }`;
 
@@ -139,23 +141,23 @@ const Navbar = () => {
             </button>
 
             {/* Auth */}
-            {user ? (
+            {displayUser ? (
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setUserDropdownOpen((v) => !v)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
                 >
-                  {user.photoURL ? (
+                  {displayUser.photoURL ? (
                     <img
-                      src={user.photoURL}
-                      alt={user.displayName || 'User'}
+                      src={displayUser.photoURL}
+                      alt={displayUser.displayName || 'User'}
                       className="w-7 h-7 rounded-full object-cover"
                     />
                   ) : (
                     <User size={18} className="text-gray-600" />
                   )}
                   <span className="text-sm font-medium text-gray-700 max-w-[100px] truncate">
-                    {user.displayName?.split(' ')[0] || 'Account'}
+                    {displayUser.displayName?.split(' ')[0] || 'Account'}
                   </span>
                 </button>
 
@@ -165,7 +167,7 @@ const Navbar = () => {
                     <div className="px-4 py-2 border-b border-gray-100 mb-1">
                       <p className="text-xs text-gray-500">Signed in as</p>
                       <p className="text-sm font-semibold text-gray-800 truncate">
-                        {user.displayName || user.email}
+                        {displayUser.displayName || displayUser.email}
                       </p>
                     </div>
                     {[
@@ -283,13 +285,13 @@ const Navbar = () => {
 
             {/* Mobile auth */}
             <div className="border-t border-gray-100 pt-3">
-              {user ? (
+              {displayUser ? (
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-3 px-3 py-2">
-                    {user.photoURL ? (
+                    {displayUser.photoURL ? (
                       <img
-                        src={user.photoURL}
-                        alt={user.displayName || 'User'}
+                        src={displayUser.photoURL}
+                        alt={displayUser.displayName || 'User'}
                         className="w-9 h-9 rounded-full object-cover"
                       />
                     ) : (
@@ -297,14 +299,14 @@ const Navbar = () => {
                         className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold"
                         style={{ backgroundColor: '#1B6B3A' }}
                       >
-                        {(user.displayName || 'U')[0].toUpperCase()}
+                        {(displayUser.displayName || 'U')[0].toUpperCase()}
                       </div>
                     )}
                     <div>
                       <p className="text-sm font-semibold text-gray-800">
-                        {user.displayName || 'User'}
+                        {displayUser.displayName || 'User'}
                       </p>
-                      <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                      <p className="text-xs text-gray-400 truncate">{displayUser.email}</p>
                     </div>
                   </div>
                   {[

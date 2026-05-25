@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   TrendingUp,
@@ -11,6 +11,9 @@ import {
   CheckCircle2,
   ArrowUpRight,
 } from "lucide-react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../../firebase/firebase";
+import { useAppContext } from "../../context/AppContext";
 import { dummyProducts, dummyOrders } from "../../assets/keralaData";
 
 // ─────────────────────────────────────────────────────────────
@@ -73,18 +76,81 @@ const StatCard = ({ title, value, icon: Icon, iconBg, iconColor, subtitle }) => 
 // ─────────────────────────────────────────────────────────────
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { products, categories } = useAppContext();
+  const [orders, setOrders] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalOrders = dummyOrders.length;
-  const totalRevenue = dummyOrders.reduce((sum, o) => sum + o.amount, 0);
-  const pendingOrders = dummyOrders.filter(
-    (o) => o.status !== "delivered" && o.status !== "cancelled"
-  ).length;
-  const totalCustomers = 24; // static placeholder
+  useEffect(() => {
+    // 1. Listen to orders in real-time
+    const unsubOrders = onSnapshot(
+      collection(db, "orders"),
+      (snapshot) => {
+        const orderList = [];
+        snapshot.forEach((doc) => {
+          orderList.push({ ...doc.data(), id: doc.id });
+        });
+        setOrders(orderList);
+      },
+      (error) => {
+        console.warn("Orders sync failed for dashboard:", error);
+        setOrders(dummyOrders);
+      }
+    );
 
-  const lowStockProducts = dummyProducts.filter((p) => p.stock < 10);
-  const recentOrders = [...dummyOrders]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5);
+    // 2. Listen to users (customers) in real-time
+    const unsubUsers = onSnapshot(
+      collection(db, "users"),
+      (snapshot) => {
+        const userList = [];
+        snapshot.forEach((doc) => {
+          userList.push({ ...doc.data(), uid: doc.id });
+        });
+        setUsers(userList);
+        setLoading(false);
+      },
+      (error) => {
+        console.warn("Users sync failed for dashboard:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      unsubOrders();
+      unsubUsers();
+    };
+  }, []);
+
+  const totalOrders = orders.length > 0 ? orders.length : dummyOrders.length;
+  
+  // Calculate total revenue from orders
+  const totalRevenue = useMemo(() => {
+    const targetOrders = orders.length > 0 ? orders : dummyOrders;
+    return targetOrders
+      .filter((o) => o.paymentStatus === "paid" || o.status === "delivered")
+      .reduce((sum, o) => sum + (o.amount || 0), 0);
+  }, [orders]);
+
+  const pendingOrders = useMemo(() => {
+    const targetOrders = orders.length > 0 ? orders : dummyOrders;
+    return targetOrders.filter(
+      (o) => o.status !== "delivered" && o.status !== "cancelled"
+    ).length;
+  }, [orders]);
+
+  const totalCustomers = users.length > 0 ? users.length : 24;
+
+  const lowStockProducts = useMemo(() => {
+    const targetProds = products.length > 0 ? products : dummyProducts;
+    return targetProds.filter((p) => p.stock < 10);
+  }, [products]);
+
+  const recentOrders = useMemo(() => {
+    const targetOrders = orders.length > 0 ? orders : dummyOrders;
+    return [...targetOrders]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 5);
+  }, [orders]);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -258,19 +324,21 @@ const Dashboard = () => {
         {[
           {
             label: "Products",
-            value: dummyProducts.length,
+            value: products.length > 0 ? products.length : dummyProducts.length,
             icon: Package,
             path: "/admin/products",
           },
           {
             label: "Categories",
-            value: 8,
+            value: categories.length > 0 ? categories.length : 8,
             icon: TrendingUp,
             path: "/admin/categories",
           },
           {
             label: "Delivered",
-            value: dummyOrders.filter((o) => o.status === "delivered").length,
+            value: orders.length > 0 
+              ? orders.filter((o) => o.status === "delivered").length 
+              : dummyOrders.filter((o) => o.status === "delivered").length,
             icon: CheckCircle2,
             path: "/admin/orders",
           },

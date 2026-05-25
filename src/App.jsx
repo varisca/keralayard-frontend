@@ -32,6 +32,7 @@ const AdminCategories = lazy(() => import("./pages/admin/Categories"));
 const AdminOrders = lazy(() => import("./pages/admin/Orders"));
 const AdminCustomers = lazy(() => import("./pages/admin/Customers"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
+const AdminStaff = lazy(() => import("./pages/admin/Staff"));
 
 const App = () => {
   const location = useLocation();
@@ -83,6 +84,7 @@ const App = () => {
                 <Route path="categories" element={<AdminCategories />} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="customers" element={<AdminCustomers />} />
+                <Route path="staff" element={<AdminStaff />} />
               </Route>
             </Route>
           </Routes>

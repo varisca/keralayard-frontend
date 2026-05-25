@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { auth, db, signInWithGoogle, signOutUser } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
@@ -11,9 +11,23 @@ export const AppContext = createContext();
 export const AppContextProvider = ({ children }) => {
   const currency = import.meta.env.VITE_CURRENCY || "₹";
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // ── Session States ────────────────────────────────────────────────────────
+  const [staffUser, setStaffUser] = useState(() => {
+    const saved = localStorage.getItem("ky_admin_session");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse custom admin session:", e);
+      }
+    }
+    return null;
+  });
+
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [firebaseUserAdmin, setFirebaseUserAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [showUserLogin, setShowUserLogin] = useState(false);
 
@@ -25,55 +39,114 @@ export const AppContextProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ── Auth listener ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        
-        // Check admin claim via Firestore user doc (custom claims alternative for web)
-        const userRef = doc(db, "users", firebaseUser.uid);
-        const userSnap = await getDoc(userRef);
-        
-        let isUserAdmin = false;
-        if (userSnap.exists()) {
-          isUserAdmin = userSnap.data().role === "admin";
-        } else {
-          // Auto-admin for local dev / testing if email contains admin or lawrence
-          const shouldBeAdmin = firebaseUser.email?.toLowerCase().includes("admin") || 
-                              firebaseUser.email?.toLowerCase().includes("lawrence");
-          
-          // Create user doc on first login
-          await setDoc(userRef, {
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName,
-            email: firebaseUser.email,
-            photoURL: firebaseUser.photoURL,
-            role: shouldBeAdmin ? "admin" : "customer",
-            createdAt: serverTimestamp(),
-          });
-          isUserAdmin = shouldBeAdmin;
-        }
-        setIsAdmin(isUserAdmin);
+  // Derive active session state based on route
+  const isAdminPath = location.pathname.startsWith("/admin");
+  const user = isAdminPath ? staffUser : firebaseUser;
+  const isAdmin = isAdminPath
+    ? (staffUser ? (staffUser.role === "admin" || staffUser.role === "employee") : false)
+    : firebaseUserAdmin;
 
-        // Load cart from Firestore
-        const cartRef = doc(db, "carts", firebaseUser.uid);
-        const cartSnap = await getDoc(cartRef);
-        if (cartSnap.exists()) {
-          setCartItems(cartSnap.data().items || {});
+  // ── Staff Auto-Seeder ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const seedStaff = async () => {
+      try {
+        const staffRef = collection(db, "staff");
+        const snap = await getDocs(query(staffRef));
+        if (snap.empty) {
+          console.log("Seeding default admin credentials...");
+          await setDoc(doc(db, "staff", "admin_keralayard_com"), {
+            uid: "admin_keralayard_com",
+            name: "Kerala Yard Admin",
+            email: "admin@keralayard.com",
+            password: "admin@123",
+            role: "admin",
+            active: true,
+            createdAt: new Date().toISOString(),
+          });
         }
-      } else {
-        // Temporary mock session for testing purposes
-        setUser({
-          uid: "test_user_123",
-          displayName: "Lawrence Test",
-          email: "lawrence@test.com",
-          photoURL: null,
-        });
-        setIsAdmin(true);
-        setCartItems({});
+      } catch (err) {
+        console.warn("Staff seeding failed/already done:", err);
       }
-      setAuthLoading(false);
+    };
+    seedStaff();
+  }, []);
+
+  // ── Auth listener (Google Auth and database check for shoppers) ─────────────
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setAuthLoading(true);
+      try {
+        if (fbUser) {
+          // Check if this is an administrative staff session currently logged in
+          const saved = localStorage.getItem("ky_admin_session");
+          let isStaffSession = false;
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              if (parsed.email === fbUser.email) {
+                isStaffSession = true;
+              }
+            } catch (e) {
+              console.error("Failed to check active staff session:", e);
+            }
+          }
+
+          if (isStaffSession) {
+            // Shopper storefront session should ignore this administrative session
+            setFirebaseUser(null);
+            setFirebaseUserAdmin(false);
+            setAuthLoading(false);
+            return;
+          }
+
+          setFirebaseUser(fbUser);
+          
+          // Check customer record in the separate /customers collection
+          const userRef = doc(db, "customers", fbUser.uid);
+          const userSnap = await getDoc(userRef);
+          
+          let isUserAdmin = false;
+          if (userSnap.exists()) {
+            isUserAdmin = userSnap.data().role === "admin";
+          } else {
+            // Auto-admin for local dev / testing if email contains admin, lawrence or keralayard
+            const shouldBeAdmin = fbUser.email?.toLowerCase().includes("admin") || 
+                                fbUser.email?.toLowerCase().includes("lawrence") ||
+                                fbUser.email?.toLowerCase().includes("keralayard");
+            
+            // Create customer doc on first login
+            await setDoc(userRef, {
+              uid: fbUser.uid,
+              name: fbUser.displayName,
+              email: fbUser.email,
+              photoURL: fbUser.photoURL,
+              role: shouldBeAdmin ? "admin" : "customer",
+              createdAt: serverTimestamp(),
+            });
+            isUserAdmin = shouldBeAdmin;
+          }
+          setFirebaseUserAdmin(isUserAdmin);
+
+          // Load cart from Firestore
+          const cartRef = doc(db, "carts", fbUser.uid);
+          const cartSnap = await getDoc(cartRef);
+          if (cartSnap.exists()) {
+            setCartItems(cartSnap.data().items || {});
+          }
+        } else {
+          setFirebaseUser(null);
+          setFirebaseUserAdmin(false);
+          setCartItems({});
+        }
+      } catch (err) {
+        console.error("Auth listener connection/permission error:", err);
+        // Fallback: If fbUser is valid, populate locally to prevent full lockouts
+        if (fbUser) {
+          setFirebaseUser(fbUser);
+        }
+      } finally {
+        setAuthLoading(false);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -230,9 +303,11 @@ export const AppContextProvider = ({ children }) => {
   const logout = async () => {
     try {
       await signOutUser();
-      setUser(null);
-      setIsAdmin(false);
+      setFirebaseUser(null);
+      setFirebaseUserAdmin(false);
+      setStaffUser(null);
       setCartItems({});
+      localStorage.removeItem("ky_admin_session");
       navigate("/");
       toast.success("Logged out successfully");
     } catch (err) {
@@ -244,7 +319,10 @@ export const AppContextProvider = ({ children }) => {
     currency,
     navigate,
     user,
-    setUser,
+    setUser: (val) => {
+      if (isAdminPath) setStaffUser(val);
+      else setFirebaseUser(val);
+    },
     isAdmin,
     authLoading,
     showUserLogin,
@@ -267,7 +345,13 @@ export const AppContextProvider = ({ children }) => {
     setSearchQuery,
     // Legacy compat
     isSeller: isAdmin,
-    setIsSeller: setIsAdmin,
+    setIsSeller: (val) => {
+      if (isAdminPath) {
+        // derived
+      } else {
+        setFirebaseUserAdmin(val);
+      }
+    },
     axios: null, // deprecated — use Firebase SDK
     fetchProducts: () => {},
   };

@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 
@@ -48,11 +49,24 @@ const navLinks = [
     path: "/admin/customers",
     end: false,
   },
+  {
+    label: "Staff Users",
+    icon: ShieldCheck,
+    path: "/admin/staff",
+    end: false,
+  },
 ];
 
 const AdminLayout = () => {
   const { user, logout } = useAppContext();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const isEmployee = user?.role === "employee";
+  const filteredNavLinks = navLinks.filter((link) => {
+    if (link.path === "/admin/customers" && isEmployee) return false;
+    if (link.path === "/admin/staff" && isEmployee) return false;
+    return true;
+  });
 
   const displayName = user?.displayName || "Admin";
   const initials = displayName
@@ -90,7 +104,7 @@ const AdminLayout = () => {
 
       {/* Nav Links */}
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
-        {navLinks.map(({ label, icon: Icon, path, end }) => (
+        {filteredNavLinks.map(({ label, icon: Icon, path, end }) => (
           <NavLink
             key={path}
             to={path}

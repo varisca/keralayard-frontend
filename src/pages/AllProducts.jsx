@@ -36,7 +36,8 @@ const AllProducts = () => {
 
   // Re-filter whenever source data, search, or category changes
   useEffect(() => {
-    let result = [...sourceProducts];
+    // Only show active products on storefront
+    let result = sourceProducts.filter((p) => p.active !== false);
 
     if (activeCategory !== "all") {
       result = result.filter(
@@ -73,7 +74,7 @@ const AllProducts = () => {
   };
 
   return (
-    <div className="min-h-screen bg-warm pt-36 md:pt-40 pb-16">
+    <div className="min-h-screen bg-warm pt-36 md:pt-15 pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* ── Page Header ───────────────────────────────────────────── */}

@@ -42,7 +42,10 @@ const ProductCategory = () => {
   useEffect(() => {
     if (!sourceProducts.length) return;
 
-    const result = sourceProducts.filter((p) => {
+    // Only show active products on storefront
+    const activeProducts = sourceProducts.filter((p) => p.active !== false);
+
+    const result = activeProducts.filter((p) => {
       if (categoryObj) {
         return (
           p.categoryId === categoryObj.id ||
