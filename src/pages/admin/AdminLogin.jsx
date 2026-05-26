@@ -1,13 +1,70 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { db, auth } from "../../firebase/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { collection, query, where, getDocs, doc, setDoc } from "firebase/firestore";
 import { KeyRound, Mail, Loader2 } from "lucide-react";
 
+const STAFF_ROLES = ["admin", "employee"];
+
+const normalizeEmail = (value) => value.trim().toLowerCase();
+
+const findStaffAccount = async (email) => {
+  for (const collectionName of ["staff", "users"]) {
+    const snap = await getDocs(
+      query(collection(db, collectionName), where("email", "==", email))
+    );
+
+    if (!snap.empty) {
+      const accountDoc = snap.docs[0];
+      return {
+        id: accountDoc.id,
+        source: collectionName,
+        data: accountDoc.data(),
+      };
+    }
+  }
+
+  return null;
+};
+
+const buildSession = ({ account, firebaseUser, email }) => {
+  const data = account?.data || {};
+  const uid = data.uid || firebaseUser?.uid || account?.id || email.replace(/[^a-z0-9]/g, "_");
+
+  return {
+    uid,
+    name: data.name || firebaseUser?.displayName || "Admin",
+    email,
+    role: data.role || "employee",
+    photoURL: firebaseUser?.photoURL || data.photoURL || null,
+    isStaff: true,
+  };
+};
+
+const validateStaffAccount = async (account) => {
+  const role = account?.data?.role;
+
+  if (!account || !STAFF_ROLES.includes(role)) {
+    await auth.signOut();
+    toast.error("Access denied. This account does not have staff privileges.", {
+      style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
+    });
+    return false;
+  }
+
+  if (account.data.active === false) {
+    await auth.signOut();
+    toast.error("Access denied. Your account has been suspended.", {
+      style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
+    });
+    return false;
+  }
+
+  return true;
+};
+
 const AdminLogin = () => {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
