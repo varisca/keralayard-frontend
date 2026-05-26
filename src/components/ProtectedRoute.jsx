@@ -8,7 +8,7 @@ const ProtectedRoute = () => {
 
   if (authLoading) return <Loading fullScreen />;
 
-  // Block both unauthenticated guests AND active administrative staff accounts
+  // Block both unauthenticated guests and active admin/employee accounts
   if (!user || user.isStaff) {
     // Open Google Login modal and redirect to storefront home
     setTimeout(() => setShowUserLogin(true), 100);

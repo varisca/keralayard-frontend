@@ -10,9 +10,9 @@ import {
   Loader2,
 } from "lucide-react";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../firebase/firebase";
+import { auth, db, storage } from "../../firebase/firebase";
 import { useAppContext } from "../../context/AppContext";
+import { uploadImageWithFallback } from "../../utils/imageUpload";
 import toast from "react-hot-toast";
 
 // ─────────────────────────────────────────────────────────────
@@ -31,6 +31,21 @@ const COLOR_PRESETS = [
 
 const EMOJI_PRESETS = ["🍌", "🥥", "🌶️", "🥣", "❄️", "🧆", "🌾", "🫙", "🍛", "🫓", "☕", "🍯"];
 
+const MEASUREMENT_OPTIONS = [
+  "g",
+  "kg",
+  "mg",
+  "ml",
+  "L",
+  "piece",
+  "pack",
+  "box",
+  "bottle",
+  "jar",
+  "tin",
+  "dozen",
+];
+
 const Categories = () => {
   const { categories, categoriesLoading } = useAppContext();
   const [modalOpen, setModalOpen] = useState(false);
@@ -44,6 +59,7 @@ const Categories = () => {
   const [bgColor, setBgColor] = useState("#FFF3E0");
   const [imageFile, setImageFile] = useState(null);
   const [imageUrl, setImageUrl] = useState("");
+  const [selectedMeasurementOptions, setSelectedMeasurementOptions] = useState(["g", "kg"]);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -71,6 +87,7 @@ const Categories = () => {
     setBgColor("#FFF3E0");
     setImageFile(null);
     setImageUrl("");
+    setSelectedMeasurementOptions(["g", "kg"]);
     setModalOpen(true);
   };
 
@@ -84,6 +101,7 @@ const Categories = () => {
     setBgColor(cat.bgColor || "#FFF3E0");
     setImageFile(null);
     setImageUrl(cat.image || "");
+    setSelectedMeasurementOptions(cat.measurementOptions?.length ? cat.measurementOptions : ["g", "kg"]);
     setModalOpen(true);
   };
 
@@ -98,10 +116,16 @@ const Categories = () => {
   const uploadImage = async (file) => {
     setUploading(true);
     try {
-      const storageRef = ref(storage, `categories/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      return downloadUrl;
+      const result = await uploadImageWithFallback({
+        storage,
+        file,
+        path: `categories/${Date.now()}_${file.name}`,
+        skipStorage: !auth.currentUser,
+      });
+      if (!result.storageBacked) {
+        toast.success("Image saved locally for this category.");
+      }
+      return result.url;
     } catch (err) {
       console.error("Image upload failed:", err);
       toast.error("Failed to upload image. Using fallback.");
@@ -116,6 +140,7 @@ const Categories = () => {
     e.preventDefault();
     if (!name.trim()) return toast.error("Category name is required");
     if (!slug.trim()) return toast.error("Slug is required");
+    if (selectedMeasurementOptions.length === 0) return toast.error("Choose at least one measurement option");
 
     setSaving(true);
     try {
@@ -132,6 +157,7 @@ const Categories = () => {
         icon,
         bgColor,
         image: finalImageUrl || null,
+        measurementOptions: selectedMeasurementOptions,
       };
 
       await setDoc(doc(db, "categories", categoryId), payload);
@@ -156,6 +182,19 @@ const Categories = () => {
       console.error("Delete category error:", err);
       toast.error("Failed to delete category.");
     }
+  };
+
+  const addMeasurementOption = (option) => {
+    if (!option) return;
+    setSelectedMeasurementOptions((prev) =>
+      prev.includes(option) ? prev : [...prev, option]
+    );
+  };
+
+  const removeMeasurementOption = (option) => {
+    setSelectedMeasurementOptions((prev) =>
+      prev.filter((item) => item !== option)
+    );
   };
 
   return (
@@ -236,6 +275,16 @@ const Categories = () => {
                   <p className="text-gray-400 text-xs mt-0.5 font-mono">
                     id: {category.id}
                   </p>
+                  <div className="flex flex-wrap gap-1 mt-3">
+                    {(category.measurementOptions || ["g", "kg"]).map((option) => (
+                      <span
+                        key={option}
+                        className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold"
+                      >
+                        {option}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -358,6 +407,44 @@ const Categories = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Measurement Options */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase block">
+                  Product Measurement Options
+                </label>
+                <select
+                  value=""
+                  onChange={(e) => addMeasurementOption(e.target.value)}
+                  className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white cursor-pointer"
+                >
+                  <option value="" disabled>
+                    Choose measurement option
+                  </option>
+                  {MEASUREMENT_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedMeasurementOptions.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {selectedMeasurementOptions.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => removeMeasurementOption(option)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 text-[#1B6B3A] border border-green-200 text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                        title="Remove option"
+                      >
+                        {option}
+                        <X size={12} />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Image Upload Option */}

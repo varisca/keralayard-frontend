@@ -6,31 +6,29 @@ import { onAuthStateChanged } from "firebase/auth";
 
 // ── Order status pipeline ────────────────────────────────────────────────
 const STATUS_STEPS = [
-  "placed",
-  "confirmed",
-  "processing",
-  "packed",
-  "shipped",
-  "out-for-delivery",
-  "delivered",
+  { key: "placed",    label: "Order Placed", icon: "📦" },
+  { key: "preparing", label: "Preparing",    icon: "🍳" },
+  { key: "shipped",   label: "Shipped",      icon: "🚚" },
+  { key: "delivered", label: "Delivered",    icon: "✅" },
 ];
 
-const STATUS_LABELS = {
-  placed: "Placed",
-  confirmed: "Confirmed",
-  processing: "Processing",
-  packed: "Packed",
-  shipped: "Shipped",
-  "out-for-delivery": "Out for Delivery",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-};
-
-// Normalise status string to one of our known keys
+// Map old granular statuses → simplified 4-step pipeline
 const normaliseStatus = (raw = "") => {
   const s = raw.toString().toLowerCase().trim().replace(/\s+/g, "-");
-  if (s === "order-placed") return "placed";
-  return s;
+  if (["placed", "confirmed"].includes(s) || s === "order-placed") return "placed";
+  if (["processing", "packed"].includes(s)) return "preparing";
+  if (["shipped", "out-for-delivery"].includes(s)) return "shipped";
+  if (s === "delivered") return "delivered";
+  if (s === "cancelled") return "cancelled";
+  return "placed";
+};
+
+const STATUS_LABELS = {
+  placed:    "Order Placed",
+  preparing: "Preparing",
+  shipped:   "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
 };
 
 // ── Status Badge ─────────────────────────────────────────────────────────
@@ -38,19 +36,13 @@ const StatusBadge = ({ status }) => {
   const s = normaliseStatus(status);
   const configs = {
     delivered: "bg-green-100 text-green-700 border-green-200",
-    cancelled: "bg-red-100 text-red-600 border-red-200",
-    placed: "bg-blue-100 text-blue-600 border-blue-200",
-    confirmed: "bg-yellow-100 text-yellow-700 border-yellow-200",
-    packed: "bg-orange-100 text-orange-600 border-orange-200",
-    shipped: "bg-pink-100 text-pink-600 border-pink-200",
-    "out-for-delivery": "bg-purple-100 text-purple-600 border-purple-200",
+    cancelled:  "bg-red-100 text-red-600 border-red-200",
+    placed:     "bg-blue-100 text-blue-600 border-blue-200",
+    preparing:  "bg-yellow-100 text-yellow-700 border-yellow-200",
+    shipped:    "bg-purple-100 text-purple-600 border-purple-200",
   };
-  const cls =
-    configs[s] || "bg-gray-100 text-gray-600 border-gray-200";
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}
-    >
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${configs[s] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
       {STATUS_LABELS[s] || status}
     </span>
   );
@@ -59,66 +51,48 @@ const StatusBadge = ({ status }) => {
 // ── Active Order Status Timeline ──────────────────────────────────────────
 const StatusTimeline = ({ status }) => {
   const normStatus = normaliseStatus(status);
-  const currentIdx = STATUS_STEPS.indexOf(normStatus);
+  const currentIdx = STATUS_STEPS.findIndex((s) => s.key === normStatus);
 
   return (
-    <div className="mt-4 w-full overflow-hidden">
-      <div className="flex items-start w-full gap-0">
-        {STATUS_STEPS.map((step, idx) => {
-          const isCompleted = idx < currentIdx;
-          const isCurrent = idx === currentIdx;
-          const isLast = idx === STATUS_STEPS.length - 1;
+    <div className="flex items-center w-full mt-2">
+      {STATUS_STEPS.map((step, idx) => {
+        const isCompleted = idx < currentIdx;
+        const isCurrent   = idx === currentIdx;
+        const isLast      = idx === STATUS_STEPS.length - 1;
 
-          return (
-            <div key={step} className={`flex items-start min-w-0 ${isLast ? "flex-none" : "flex-1"}`}>
-              {/* Step dot */}
-              <div className="flex w-10 flex-shrink-0 flex-col items-center gap-1">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all ${
-                    isCompleted
-                      ? "bg-primary border-primary text-white"
-                      : isCurrent
-                      ? "bg-white border-primary text-primary ring-4 ring-primary/20"
-                      : "bg-white border-gray-300 text-gray-400"
-                  }`}
-                >
-                  {isCompleted ? (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  ) : (
-                    <span className="text-xs">{idx + 1}</span>
-                  )}
-                </div>
-                <span
-                  className={`text-[10px] font-medium text-center w-16 -mx-3 leading-tight ${
-                    isCurrent
-                      ? "text-primary font-bold"
-                      : isCompleted
-                      ? "text-gray-600"
-                      : "text-gray-400"
-                  }`}
-                >
-                  {STATUS_LABELS[step]}
-                </span>
+        return (
+          <div key={step.key} className={`flex items-center ${isLast ? "" : "flex-1"}`}>
+            {/* Node */}
+            <div className="flex flex-col items-center gap-1.5">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg border-2 transition-all ${
+                isCompleted
+                  ? "bg-primary border-primary"
+                  : isCurrent
+                  ? "bg-white border-primary ring-4 ring-primary/20"
+                  : "bg-white border-gray-200"
+              }`}>
+                {isCompleted ? (
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <span className={isCurrent ? "" : "grayscale opacity-40"}>{step.icon}</span>
+                )}
               </div>
-
-              {/* Connector line */}
-              {!isLast && (
-                <div
-                  className={`h-0.5 flex-1 min-w-3 mx-2 mt-4 rounded-full transition-all ${
-                    isCompleted ? "bg-primary" : "bg-gray-200"
-                  }`}
-                />
-              )}
+              <span className={`text-[11px] font-semibold text-center whitespace-nowrap ${
+                isCurrent ? "text-primary" : isCompleted ? "text-gray-600" : "text-gray-400"
+              }`}>
+                {step.label}
+              </span>
             </div>
-          );
-        })}
-      </div>
+
+            {/* Connector */}
+            {!isLast && (
+              <div className={`flex-1 h-0.5 mx-2 mb-5 rounded-full transition-all ${isCompleted ? "bg-primary" : "bg-gray-200"}`} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

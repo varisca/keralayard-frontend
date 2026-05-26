@@ -15,13 +15,11 @@ const Footer = () => {
     { label: 'Products', to: '/products' },
     { label: 'About Us', to: '/about' },
     { label: 'Contact', to: '/contact' },
-    { label: 'Blog', to: '/blog' },
   ];
 
   const customerCare = [
     { label: 'My Account', to: '/profile' },
     { label: 'My Orders', to: '/my-orders' },
-    { label: 'Track Order', to: '/track' },
     { label: 'Return Policy', to: '/returns' },
     { label: 'Privacy Policy', to: '/privacy' },
     { label: 'Terms & Conditions', to: '/terms' },
@@ -34,14 +32,15 @@ const Footer = () => {
 
           {/* ── Column 1: Brand + Social ── */}
           <div className="flex flex-col gap-4">
-            <Link to="/" className="inline-flex items-center gap-2">
+            <Link to="/" className="inline-flex items-center">
+              <span className="inline-flex items-center rounded-xl bg-white px-1 py-1">
               <img
-                src="/logo.png"
+                src="/Kerala Yard.svg"
                 alt="Kerala Yard"
-                className="h-10 w-auto object-contain brightness-0 invert"
-                style={{ height: '40px', width: 'auto' }}
+                className="h-10 w-auto object-contain"
+                style={{ height: '60px', width: 'auto' }}
               />
-              <span className="text-xl font-bold tracking-tight">Kerala Yard</span>
+              </span>
             </Link>
 
             <p className="text-sm leading-relaxed text-white/75 max-w-xs">

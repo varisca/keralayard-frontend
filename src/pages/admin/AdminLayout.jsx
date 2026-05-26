@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -50,9 +50,9 @@ const navLinks = [
     end: false,
   },
   {
-    label: "Staff Users",
+    label: "Users",
     icon: ShieldCheck,
-    path: "/admin/staff",
+    path: "/admin/users",
     end: false,
   },
 ];
@@ -64,11 +64,11 @@ const AdminLayout = () => {
   const isEmployee = user?.role === "employee";
   const filteredNavLinks = navLinks.filter((link) => {
     if (link.path === "/admin/customers" && isEmployee) return false;
-    if (link.path === "/admin/staff" && isEmployee) return false;
+    if (link.path === "/admin/users" && isEmployee) return false;
     return true;
   });
 
-  const displayName = user?.displayName || "Admin";
+  const displayName = user?.name || user?.displayName || "Admin";
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
@@ -104,7 +104,7 @@ const AdminLayout = () => {
 
       {/* Nav Links */}
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
-        {filteredNavLinks.map(({ label, icon: Icon, path, end }) => (
+        {filteredNavLinks.map(({ label, icon, path, end }) => (
           <NavLink
             key={path}
             to={path}
@@ -124,10 +124,10 @@ const AdminLayout = () => {
           >
             {({ isActive }) => (
               <>
-                <Icon
-                  size={18}
-                  className={`flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`}
-                />
+                {React.createElement(icon, {
+                  size: 18,
+                  className: `flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`,
+                })}
                 <span className="hidden md:block text-sm">{label}</span>
                 {isActive && (
                   <ChevronRight

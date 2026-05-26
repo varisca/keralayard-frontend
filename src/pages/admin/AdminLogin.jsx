@@ -9,20 +9,17 @@ const STAFF_ROLES = ["admin", "employee"];
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
 
-const findStaffAccount = async (email) => {
-  for (const collectionName of ["staff", "users"]) {
-    const snap = await getDocs(
-      query(collection(db, collectionName), where("email", "==", email))
-    );
+const findUserAccount = async (email) => {
+  const snap = await getDocs(
+    query(collection(db, "users"), where("email", "==", email))
+  );
 
-    if (!snap.empty) {
-      const accountDoc = snap.docs[0];
-      return {
-        id: accountDoc.id,
-        source: collectionName,
-        data: accountDoc.data(),
-      };
-    }
+  if (!snap.empty) {
+    const accountDoc = snap.docs[0];
+    return {
+      id: accountDoc.id,
+      data: accountDoc.data(),
+    };
   }
 
   return null;
@@ -42,12 +39,12 @@ const buildSession = ({ account, firebaseUser, email }) => {
   };
 };
 
-const validateStaffAccount = async (account) => {
+const validateUserAccount = async (account) => {
   const role = account?.data?.role;
 
   if (!account || !STAFF_ROLES.includes(role)) {
     await auth.signOut();
-    toast.error("Access denied. This account does not have staff privileges.", {
+    toast.error("Access denied. This account does not have admin or employee privileges.", {
       style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
     });
     return false;
@@ -77,12 +74,37 @@ const AdminLogin = () => {
 
     setLoading(true);
     try {
+      const normalizedEmail = normalizeEmail(email);
+      const account = await findUserAccount(normalizedEmail);
+
+      if (account?.data?.password) {
+        if (password.trim() !== account.data.password) {
+          toast.error("Invalid email or password", {
+            style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
+          });
+          return;
+        }
+
+        const canAccess = await validateUserAccount(account);
+        if (!canAccess) return;
+
+        const sessionPayload = buildSession({ account, email: normalizedEmail });
+        localStorage.setItem("ky_admin_session", JSON.stringify(sessionPayload));
+        await setDoc(doc(db, "users", account.id), {
+          uid: sessionPayload.uid,
+          lastLoginAt: new Date().toISOString(),
+        }, { merge: true });
+
+        toast.success(`Welcome back, ${sessionPayload.name}!`);
+        window.location.href = "/admin";
+        return;
+      }
       // ── Step 1: Authenticate via Firebase Auth ──────────────────────────
       let userCredential;
       try {
         userCredential = await signInWithEmailAndPassword(
           auth,
-          email.trim().toLowerCase(),
+          normalizedEmail,
           password.trim()
         );
       } catch (authErr) {
@@ -105,21 +127,15 @@ const AdminLogin = () => {
       const firebaseUid = userCredential.user.uid;
 
       // ── Step 2: Look up role in the users collection ────────────────────
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("email", "==", email.trim().toLowerCase()));
-      const snap = await getDocs(q);
-
-      let userDoc = null;
-      if (!snap.empty) {
-        userDoc = snap.docs[0].data();
-      }
+      const authAccount = await findUserAccount(normalizedEmail);
+      const userDoc = authAccount?.data || null;
+      const userDocId = authAccount?.id || firebaseUid;
 
       // ── Step 3: Verify role is admin or employee ────────────────────────
       const role = userDoc?.role;
       if (!role || (role !== "admin" && role !== "employee")) {
-        // Signed in to Firebase Auth but not a staff member
         await auth.signOut();
-        toast.error("Access denied. This account does not have staff privileges.", {
+        toast.error("Access denied. This account does not have admin or employee privileges.", {
           style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
         });
         return;
@@ -134,10 +150,10 @@ const AdminLogin = () => {
       }
 
       // ── Step 4: Upsert users doc to ensure uid is synced ────────────────
-      await setDoc(doc(db, "users", firebaseUid), {
+      await setDoc(doc(db, "users", userDocId), {
         uid: firebaseUid,
         name: userDoc?.name || userCredential.user.displayName || "Admin",
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         photoURL: userCredential.user.photoURL || null,
         role,
         active: true,
@@ -147,7 +163,7 @@ const AdminLogin = () => {
       const sessionPayload = {
         uid: firebaseUid,
         name: userDoc?.name || userCredential.user.displayName || "Admin",
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         role,
         photoURL: userCredential.user.photoURL || null,
         isStaff: true,
@@ -210,7 +226,7 @@ const AdminLogin = () => {
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block"
                   style={{ backgroundColor: "#D4A017", color: "#1A1A2E" }}
                 >
-                  STAFF PORTAL
+                  ADMIN PORTAL
                 </span>
               </div>
             </div>

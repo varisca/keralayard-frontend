@@ -6,14 +6,29 @@ import {
   X,
   Loader2,
   Save,
-  Trash2,
   Package,
 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../firebase/firebase";
+import { auth, db, storage } from "../../firebase/firebase";
 import { useAppContext } from "../../context/AppContext";
+import { uploadImageWithFallback } from "../../utils/imageUpload";
 import toast from "react-hot-toast";
+
+const DEFAULT_MEASUREMENT_OPTIONS = ["g", "kg", "ml", "L", "piece", "pack", "box", "bottle", "jar"];
+
+const splitWeight = (value = "", unitOptions = DEFAULT_MEASUREMENT_OPTIONS) => {
+  const trimmed = value.trim();
+  const unit = [...unitOptions]
+    .sort((a, b) => b.length - a.length)
+    .find((option) => trimmed.toLowerCase().endsWith(option.toLowerCase()));
+
+  if (!unit) return { amount: trimmed, unit: unitOptions[0] || "g" };
+
+  return {
+    amount: trimmed.slice(0, -unit.length).trim(),
+    unit,
+  };
+};
 
 // Toggle component
 const Toggle = ({ checked, onChange, activeColor = "#1B6B3A" }) => (
@@ -34,7 +49,7 @@ const Toggle = ({ checked, onChange, activeColor = "#1B6B3A" }) => (
 const AddEditProduct = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { categories, categoriesLoading, user } = useAppContext();
+  const { categories, user } = useAppContext();
 
   useEffect(() => {
     if (user?.role === "employee") {
@@ -53,7 +68,8 @@ const AddEditProduct = () => {
   const [mrp, setMrp] = useState("");
   const [sellingPrice, setSellingPrice] = useState("");
   const [stock, setStock] = useState("");
-  const [weight, setWeight] = useState("");
+  const [weightAmount, setWeightAmount] = useState("");
+  const [measurementUnit, setMeasurementUnit] = useState(DEFAULT_MEASUREMENT_OPTIONS[0]);
   const [featured, setFeatured] = useState(false);
   const [active, setActive] = useState(true);
   const [tags, setTags] = useState("");
@@ -63,6 +79,13 @@ const AddEditProduct = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const selectedCategory =
+    (categories && categories.find((c) => c.id === categoryId)) || null;
+  const measurementOptions =
+    selectedCategory?.measurementOptions?.length > 0
+      ? selectedCategory.measurementOptions
+      : DEFAULT_MEASUREMENT_OPTIONS;
 
   // Auto slug generation on name change (only for adding)
   const handleNameChange = (val) => {
@@ -96,7 +119,9 @@ const AddEditProduct = () => {
           setMrp(data.mrp !== undefined ? data.mrp.toString() : "");
           setSellingPrice(data.sellingPrice !== undefined ? data.sellingPrice.toString() : "");
           setStock(data.stock !== undefined ? data.stock.toString() : "");
-          setWeight(data.weight || "");
+          const parsedWeight = splitWeight(data.weight || "", DEFAULT_MEASUREMENT_OPTIONS);
+          setWeightAmount(parsedWeight.amount);
+          setMeasurementUnit(parsedWeight.unit);
           setFeatured(!!data.featured);
           setActive(data.active !== undefined ? !!data.active : true);
           setTags(data.tags ? data.tags.join(", ") : "");
@@ -116,6 +141,12 @@ const AddEditProduct = () => {
     fetchProduct();
   }, [id, isEditMode, navigate]);
 
+  useEffect(() => {
+    if (!measurementOptions.includes(measurementUnit)) {
+      setMeasurementUnit(measurementOptions[0] || DEFAULT_MEASUREMENT_OPTIONS[0]);
+    }
+  }, [measurementOptions, measurementUnit]);
+
   // Upload image to Storage
   const handleImageUpload = async (e) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -123,12 +154,15 @@ const AddEditProduct = () => {
 
     setUploading(true);
     try {
-      const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
+      const result = await uploadImageWithFallback({
+        storage,
+        file,
+        path: `products/${Date.now()}_${file.name}`,
+        skipStorage: !auth.currentUser,
+      });
 
-      setImages((prev) => [...prev, downloadUrl]);
-      toast.success("Image uploaded successfully!");
+      setImages((prev) => [...prev, result.url]);
+      toast.success(result.storageBacked ? "Image uploaded successfully!" : "Image saved locally for this product.");
     } catch (err) {
       console.error("Image upload failed:", err);
       toast.error("Failed to upload image.");
@@ -150,9 +184,10 @@ const AddEditProduct = () => {
     if (!slug.trim()) return toast.error("Slug is required");
     if (!sellingPrice) return toast.error("Selling price is required");
     if (!stock) return toast.error("Stock quantity is required");
-    if (!weight.trim()) return toast.error("Weight/volume is required (e.g. 500g)");
+    if (!weightAmount.trim()) return toast.error("Weight/volume amount is required");
 
     const selectedCategory = (categories && categories.find((c) => c.id === categoryId)) || { id: "cat_general", name: "General" };
+    const finalWeight = `${weightAmount.trim()}${measurementUnit}`;
 
     setSaving(true);
     try {
@@ -177,7 +212,8 @@ const AddEditProduct = () => {
         featured,
         active,
         tags: tagArray,
-        weight: weight.trim(),
+        weight: finalWeight,
+        measurementUnit,
       };
 
       await setDoc(doc(db, "products", productId), payload);
@@ -335,14 +371,29 @@ const AddEditProduct = () => {
                 <label className="text-xs font-bold text-gray-500 uppercase">
                   Weight / Volume
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 500g, 1L, 250g"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  className="w-full px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"
-                  required
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="500"
+                    value={weightAmount}
+                    onChange={(e) => setWeightAmount(e.target.value)}
+                    className="min-w-0 flex-1 px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"
+                    required
+                    min="0"
+                    step="0.01"
+                  />
+                  <select
+                    value={measurementUnit}
+                    onChange={(e) => setMeasurementUnit(e.target.value)}
+                    className="w-24 px-2 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white cursor-pointer"
+                  >
+                    {measurementOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           </div>

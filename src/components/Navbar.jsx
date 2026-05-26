@@ -11,7 +11,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 
 const Navbar = () => {
-  const { user, logout, setShowUserLogin, getCartCount, cartItems } = useAppContext();
+  const { user, logout, setShowUserLogin, getCartCount } = useAppContext();
   const navigate = useNavigate();
 
   const displayUser = user && !user.isStaff ? user : null;
@@ -87,7 +87,7 @@ const Navbar = () => {
 
           {/* ── Logo ── */}
           <Link to="/" className="flex-shrink-0 flex items-center gap-2">
-            <img src="/logo.png" alt="Kerala Yard" className="h-50 w-auto object-contain" style={{ height: '70px', width: 'auto' }} />
+            <img src="/Kerala Yard.svg" alt="Kerala Yard" className="h-50 w-auto object-contain" style={{ height: '70px', width: 'auto' }} />
           </Link>
 
           {/* ── Desktop center nav links ── */}

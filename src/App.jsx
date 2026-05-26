@@ -84,7 +84,7 @@ const App = () => {
                 <Route path="categories" element={<AdminCategories />} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="customers" element={<AdminCustomers />} />
-                <Route path="staff" element={<AdminStaff />} />
+                <Route path="users" element={<AdminStaff />} />
               </Route>
             </Route>
           </Routes>

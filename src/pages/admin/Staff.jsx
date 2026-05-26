@@ -48,7 +48,7 @@ const Staff = () => {
   const { user } = useAppContext();
   const isEmployee = user?.role === "employee";
 
-  const [staff, setStaff] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -64,7 +64,10 @@ const Staff = () => {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // Fetch staff list in real-time
+  const makeUserDocId = (value) =>
+    value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+  // Fetch admin and employee users in real-time from the users collection
   useEffect(() => {
     const usersRef = collection(db, "users");
     const unsub = onSnapshot(
@@ -72,31 +75,34 @@ const Staff = () => {
       (snapshot) => {
         const list = [];
         snapshot.forEach((docSnap) => {
-          list.push({ ...docSnap.data(), id: docSnap.id });
+          const data = docSnap.data();
+          if (data.role === "admin" || data.role === "employee") {
+            list.push({ ...data, id: docSnap.id });
+          }
         });
         // Sort alphabetically by name
         list.sort((a, b) => a.name.localeCompare(b.name));
-        setStaff(list);
+        setAdminUsers(list);
         setLoading(false);
       },
       (err) => {
-        console.error("Failed to load staff list:", err);
+        console.error("Failed to load user list:", err);
         setLoading(false);
-        toast.error("Database connection failed. Unable to fetch staff directory.");
+        toast.error("Database connection failed. Unable to fetch user directory.");
       }
     );
 
     return () => unsub();
   }, []);
 
-  // Filtered staff list
+  // Filtered user list
   const filteredStaff = useMemo(() => {
-    return staff.filter(
+    return adminUsers.filter(
       (s) =>
         s.name.toLowerCase().includes(search.toLowerCase()) ||
         s.email.toLowerCase().includes(search.toLowerCase())
     );
-  }, [staff, search]);
+  }, [adminUsers, search]);
 
   // Open add modal
   const openAddModal = () => {
@@ -134,7 +140,7 @@ const Staff = () => {
 
     setSaving(true);
     try {
-      const docId = currentId || `staff_${email.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+      const docId = currentId || makeUserDocId(email);
       const payload = {
         uid: docId,
         name: name.trim(),
@@ -146,11 +152,11 @@ const Staff = () => {
       };
 
       await setDoc(doc(db, "users", docId), payload, { merge: true });
-      toast.success(isEditing ? "Staff user updated!" : "Staff user registered successfully! 🌿");
+      toast.success(isEditing ? "User updated!" : "User registered successfully!");
       setModalOpen(false);
     } catch (err) {
-      console.error("Error saving staff:", err);
-      toast.error("Failed to save staff details. Check permissions.");
+      console.error("Error saving user:", err);
+      toast.error("Failed to save user details. Check permissions.");
     } finally {
       setSaving(false);
     }
@@ -194,8 +200,8 @@ const Staff = () => {
       toast.success(`Account for "${deleteTarget.name}" permanently deleted`);
       setDeleteTarget(null);
     } catch (err) {
-      console.error("Delete staff error:", err);
-      toast.error("Failed to delete staff member.");
+      console.error("Delete user error:", err);
+      toast.error("Failed to delete user.");
     }
   };
 
@@ -204,9 +210,9 @@ const Staff = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            Administer dashboard credentials and operator access privileges
+            Manage admin and employee credentials from the users table
           </p>
         </div>
         {!isEmployee && (
@@ -228,7 +234,7 @@ const Staff = () => {
           <div>
             <h4 className="font-semibold text-orange-950 text-sm">Employee View-Only Access</h4>
             <p className="text-orange-800 text-xs mt-0.5 leading-relaxed">
-              Your account has Employee-level clearance. You can view the list of staff members,
+              Your account has Employee-level clearance. You can view the list of admin users and employees,
               but cannot create new accounts, modify existing credentials, toggle active states, or delete users.
             </p>
           </div>
@@ -241,7 +247,7 @@ const Staff = () => {
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search staff names or emails…"
+            placeholder="Search user names or emails..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white"

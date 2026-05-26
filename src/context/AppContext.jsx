@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { useNavigate, useLocation } from "react-router-dom";
 import { auth, db, signInWithGoogle, signOutUser } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, onSnapshot, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { dummyProducts } from "../assets/keralaData";
 
@@ -14,7 +14,7 @@ export const AppContextProvider = ({ children }) => {
   const location = useLocation();
 
   // ── Session States ────────────────────────────────────────────────────────
-  const [staffUser, setStaffUser] = useState(() => {
+  const [adminUser, setAdminUser] = useState(() => {
     const saved = localStorage.getItem("ky_admin_session");
     if (saved) {
       try {
@@ -41,34 +41,38 @@ export const AppContextProvider = ({ children }) => {
 
   // Derive active session state based on route
   const isAdminPath = location.pathname.startsWith("/admin");
-  const user = isAdminPath ? staffUser : firebaseUser;
+  const user = isAdminPath ? adminUser : firebaseUser;
   const isAdmin = isAdminPath
-    ? (staffUser ? (staffUser.role === "admin" || staffUser.role === "employee") : false)
+    ? (adminUser ? (adminUser.role === "admin" || adminUser.role === "employee") : false)
     : firebaseUserAdmin;
 
-  // ── Staff Auto-Seeder ─────────────────────────────────────────────────────
+  // Admin user auto-seeder / role fixer
   useEffect(() => {
-    const seedStaff = async () => {
+    const seedAdminUser = async () => {
       try {
-        const usersRef = collection(db, "users");
-        const snap = await getDocs(query(usersRef));
-        if (snap.empty) {
-          console.log("Seeding default employee credentials...");
-          await setDoc(doc(db, "users", "admin_keralayard_com"), {
+        const adminDocRef = doc(db, "users", "admin_keralayard_com");
+        const adminSnap = await getDoc(adminDocRef);
+        if (!adminSnap.exists()) {
+          console.log("Seeding default admin user credentials...");
+          await setDoc(adminDocRef, {
             uid: "admin_keralayard_com",
             name: "Kerala Yard Admin",
             email: "admin@keralayard.com",
             password: "admin@123",
-            role: "employee",
+            role: "admin",
             active: true,
             createdAt: new Date().toISOString(),
           });
+        } else if (adminSnap.data().role !== "admin") {
+          // Fix incorrect role if it was seeded as employee
+          await setDoc(adminDocRef, { role: "admin" }, { merge: true });
+          console.log("Fixed admin role for admin_keralayard_com");
         }
       } catch (err) {
-        console.warn("Users/Staff seeding failed/already done:", err);
+        console.warn("Users seeding failed/already done:", err);
       }
     };
-    seedStaff();
+    seedAdminUser();
   }, []);
 
   // ── Auth listener (Google Auth and database check for shoppers) ─────────────
@@ -77,21 +81,21 @@ export const AppContextProvider = ({ children }) => {
       setAuthLoading(true);
       try {
         if (fbUser) {
-          // Check if this is an administrative staff session currently logged in
+          // Check if this is an administrative users-table session currently logged in
           const saved = localStorage.getItem("ky_admin_session");
-          let isStaffSession = false;
+          let isAdminSession = false;
           if (saved) {
             try {
               const parsed = JSON.parse(saved);
               if (parsed.email === fbUser.email) {
-                isStaffSession = true;
+                isAdminSession = true;
               }
             } catch (e) {
-              console.error("Failed to check active staff session:", e);
+              console.error("Failed to check active admin session:", e);
             }
           }
 
-          if (isStaffSession) {
+          if (isAdminSession) {
             // Shopper storefront session should ignore this administrative session
             setFirebaseUser(null);
             setFirebaseUserAdmin(false);
@@ -116,7 +120,7 @@ export const AppContextProvider = ({ children }) => {
               createdAt: serverTimestamp(),
             });
           }
-          // Storefront users are never admin — admin access uses staff login
+          // Storefront users are never admin; admin access uses /users credentials.
           setFirebaseUserAdmin(false);
 
           // Load cart from Firestore
@@ -287,7 +291,7 @@ export const AppContextProvider = ({ children }) => {
       await signInWithGoogle();
       setShowUserLogin(false);
       toast.success("Welcome to Kerala Yard! 🌿");
-    } catch (err) {
+    } catch {
       toast.error("Login failed. Please try again.");
     }
   };
@@ -297,12 +301,12 @@ export const AppContextProvider = ({ children }) => {
       await signOutUser();
       setFirebaseUser(null);
       setFirebaseUserAdmin(false);
-      setStaffUser(null);
+      setAdminUser(null);
       setCartItems({});
       localStorage.removeItem("ky_admin_session");
       navigate("/");
       toast.success("Logged out successfully");
-    } catch (err) {
+    } catch {
       toast.error("Logout failed.");
     }
   };
@@ -312,7 +316,7 @@ export const AppContextProvider = ({ children }) => {
     navigate,
     user,
     setUser: (val) => {
-      if (isAdminPath) setStaffUser(val);
+      if (isAdminPath) setAdminUser(val);
       else setFirebaseUser(val);
     },
     isAdmin,

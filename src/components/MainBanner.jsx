@@ -100,9 +100,8 @@ const MainBanner = () => {
         {/* Trust badges below CTAs */}
         <div className="animate-fade-in-up animation-delay-500 flex flex-wrap items-center gap-5 mt-8">
           {[
-            { icon: '🚚', label: 'Free delivery above ₹499' },
+            { icon: '🚚', label: 'Free delivery above ₹1000' },
             { icon: '🌿', label: 'No preservatives' },
-            { icon: '⭐', label: '4.8★ Rated' },
           ].map((badge) => (
             <div key={badge.label} className="flex items-center gap-1.5 text-white/75 text-sm">
               <span>{badge.icon}</span>

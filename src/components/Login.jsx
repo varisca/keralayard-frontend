@@ -71,7 +71,7 @@ const Login = () => {
         <div className="flex flex-col items-center px-8 pt-8 pb-10 gap-6">
           {/* Logo */}
           <img
-            src="/logo.png"
+            src="/Kerala Yard.svg"
             alt="Kerala Yard"
             className="h-16 w-auto object-contain"
             style={{ height: '64px', width: 'auto' }}

@@ -9,6 +9,32 @@ import AddressModal from "../components/AddressModal";
 // ─── Placeholder image for products without images ─────────────────────────
 const PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%23F0F4F0'/%3E%3Ctext x='40' y='44' font-size='28' text-anchor='middle' fill='%231B6B3A'%3E🛒%3C/text%3E%3C/svg%3E";
 
+// ─── Smart weight/volume display based on quantity ──────────────────────────
+// e.g. "500ml" × 2 → "1L", "500g" × 3 → "1.5kg", "250g" × 1 → "250g"
+const formatWeight = (weight, quantity) => {
+  if (!weight || quantity <= 1) return weight || "";
+  const match = weight.toString().match(/^([\d.]+)\s*(ml|l|g|kg|L)$/i);
+  if (!match) return weight;
+
+  const value = parseFloat(match[1]);
+  const unit = match[2].toLowerCase();
+  const total = value * quantity;
+
+  if (unit === "ml") {
+    return total >= 1000 ? `${total / 1000}L` : `${total}ml`;
+  }
+  if (unit === "l") {
+    return `${total}L`;
+  }
+  if (unit === "g") {
+    return total >= 1000 ? `${total / 1000}kg` : `${total}g`;
+  }
+  if (unit === "kg") {
+    return `${total}kg`;
+  }
+  return `${total}${unit}`;
+};
+
 const Cart = () => {
   const {
     cartItems,
@@ -204,7 +230,7 @@ const Cart = () => {
                         {product.name}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {product.weight && `${product.weight}`}
+                        {product.weight && formatWeight(product.weight, product.quantity)}
                       </p>
                       <p className="text-primary font-bold text-sm mt-1">
                         {currency}{product.sellingPrice}

@@ -19,31 +19,33 @@ import { db } from "../../firebase/firebase";
 import toast from "react-hot-toast";
 
 
-// Curated status colors matching the theme
-const STATUS_COLORS = {
-  placed: "bg-blue-100 text-blue-700 border-blue-200",
-  confirmed: "bg-purple-100 text-purple-700 border-purple-200",
-  processing: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  packed: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  shipped: "bg-pink-100 text-pink-700 border-pink-200",
-  "out-for-delivery": "bg-orange-100 text-orange-700 border-orange-200",
-  delivered: "bg-green-100 text-green-700 border-green-200",
-  cancelled: "bg-red-100 text-red-700 border-red-200",
-};
-
-const ORDER_STATUS_FLOW = [
+// Map granular statuses → simplified 4-step pipeline for display
+const ADMIN_STATUS_FLOW = [
   "placed",
-  "confirmed",
-  "processing",
-  "packed",
+  "preparing",
   "shipped",
-  "out-for-delivery",
   "delivered",
   "cancelled",
 ];
 
-const normalizeOrderStatus = (status = "placed") =>
-  status.toString().toLowerCase().trim().replace(/\s+/g, "-") || "placed";
+// Normalise any legacy status to the simplified pipeline
+const normalizeOrderStatus = (status = "placed") => {
+  const s = status.toString().toLowerCase().trim().replace(/\s+/g, "-");
+  if (["placed", "confirmed", "order-placed"].includes(s)) return "placed";
+  if (["processing", "packed", "preparing"].includes(s)) return "preparing";
+  if (["shipped", "out-for-delivery"].includes(s)) return "shipped";
+  if (s === "delivered") return "delivered";
+  if (s === "cancelled") return "cancelled";
+  return "placed";
+};
+
+const STATUS_COLORS = {
+  placed:    "bg-blue-100 text-blue-700 border-blue-200",
+  preparing: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  shipped:   "bg-purple-100 text-purple-700 border-purple-200",
+  delivered: "bg-green-100 text-green-700 border-green-200",
+  cancelled: "bg-red-100 text-red-700 border-red-200",
+};
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -252,7 +254,7 @@ const Orders = () => {
               {orders.length}
             </span>
           </button>
-          {ORDER_STATUS_FLOW.map((status) => {
+          {ADMIN_STATUS_FLOW.map((status) => {
             const count = orders.filter((o) => o.status === status).length;
             return (
               <button
@@ -343,9 +345,9 @@ const Orders = () => {
                             color: order.status === 'delivered' ? '#047857' : '#374151',
                           }}
                         >
-                          {ORDER_STATUS_FLOW.map((s) => (
+                          {ADMIN_STATUS_FLOW.map((s) => (
                             <option key={s} value={s}>
-                              {s.toUpperCase().replace(/-/g, " ")}
+                              {s.charAt(0).toUpperCase() + s.slice(1)}
                             </option>
                           ))}
                         </select>
@@ -459,9 +461,9 @@ const Orders = () => {
                       onChange={(e) => handleUpdateStatus(selectedOrder.id, e.target.value)}
                       className="flex-1 px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white cursor-pointer"
                     >
-                      {ORDER_STATUS_FLOW.map((s) => (
+                      {ADMIN_STATUS_FLOW.map((s) => (
                         <option key={s} value={s}>
-                          Change to: {s.toUpperCase().replace(/-/g, " ")}
+                          {s.charAt(0).toUpperCase() + s.slice(1)}
                         </option>
                       ))}
                     </select>
