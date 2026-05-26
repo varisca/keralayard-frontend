@@ -50,22 +50,22 @@ export const AppContextProvider = ({ children }) => {
   useEffect(() => {
     const seedStaff = async () => {
       try {
-        const staffRef = collection(db, "staff");
-        const snap = await getDocs(query(staffRef));
+        const usersRef = collection(db, "users");
+        const snap = await getDocs(query(usersRef));
         if (snap.empty) {
-          console.log("Seeding default admin credentials...");
-          await setDoc(doc(db, "staff", "admin_keralayard_com"), {
+          console.log("Seeding default employee credentials...");
+          await setDoc(doc(db, "users", "admin_keralayard_com"), {
             uid: "admin_keralayard_com",
             name: "Kerala Yard Admin",
             email: "admin@keralayard.com",
             password: "admin@123",
-            role: "admin",
+            role: "employee",
             active: true,
             createdAt: new Date().toISOString(),
           });
         }
       } catch (err) {
-        console.warn("Staff seeding failed/already done:", err);
+        console.warn("Users/Staff seeding failed/already done:", err);
       }
     };
     seedStaff();
@@ -101,31 +101,23 @@ export const AppContextProvider = ({ children }) => {
 
           setFirebaseUser(fbUser);
           
-          // Check customer record in the separate /customers collection
+          // Check / create customer record in /customers collection
           const userRef = doc(db, "customers", fbUser.uid);
           const userSnap = await getDoc(userRef);
           
-          let isUserAdmin = false;
-          if (userSnap.exists()) {
-            isUserAdmin = userSnap.data().role === "admin";
-          } else {
-            // Auto-admin for local dev / testing if email contains admin, lawrence or keralayard
-            const shouldBeAdmin = fbUser.email?.toLowerCase().includes("admin") || 
-                                fbUser.email?.toLowerCase().includes("lawrence") ||
-                                fbUser.email?.toLowerCase().includes("keralayard");
-            
-            // Create customer doc on first login
+          if (!userSnap.exists()) {
+            // First login — create customer document
             await setDoc(userRef, {
               uid: fbUser.uid,
               name: fbUser.displayName,
               email: fbUser.email,
               photoURL: fbUser.photoURL,
-              role: shouldBeAdmin ? "admin" : "customer",
+              role: "customer",
               createdAt: serverTimestamp(),
             });
-            isUserAdmin = shouldBeAdmin;
           }
-          setFirebaseUserAdmin(isUserAdmin);
+          // Storefront users are never admin — admin access uses staff login
+          setFirebaseUserAdmin(false);
 
           // Load cart from Firestore
           const cartRef = doc(db, "carts", fbUser.uid);

@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { db } from "../../firebase/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { db, auth } from "../../firebase/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { collection, query, where, getDocs, doc, setDoc } from "firebase/firestore";
 import { KeyRound, Mail, Loader2 } from "lucide-react";
 
 const AdminLogin = () => {
@@ -19,107 +20,94 @@ const AdminLogin = () => {
 
     setLoading(true);
     try {
-      const staffRef = collection(db, "staff");
-      const q = query(staffRef, where("email", "==", email.trim().toLowerCase()));
-      const snap = await getDocs(q);
-
-      if (snap.empty) {
-        toast.error("Invalid email or password", {
+      // ── Step 1: Authenticate via Firebase Auth ──────────────────────────
+      let userCredential;
+      try {
+        userCredential = await signInWithEmailAndPassword(
+          auth,
+          email.trim().toLowerCase(),
+          password.trim()
+        );
+      } catch (authErr) {
+        console.error("Firebase Auth error:", authErr.code);
+        const msg =
+          authErr.code === "auth/wrong-password" ||
+          authErr.code === "auth/invalid-credential"
+            ? "Invalid email or password"
+            : authErr.code === "auth/user-not-found"
+            ? "No admin account found with this email"
+            : authErr.code === "auth/too-many-requests"
+            ? "Too many failed attempts. Try again later."
+            : "Login failed. Check your credentials.";
+        toast.error(msg, {
           style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
         });
         return;
       }
 
-      let matchedUser = null;
-      snap.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.password === password.trim()) {
-          matchedUser = { ...data, id: docSnap.id };
-        }
-      });
+      const firebaseUid = userCredential.user.uid;
 
-      if (matchedUser) {
-        if (!matchedUser.active) {
-          toast.error("Access denied. Your account is suspended.", {
-            style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
-          });
-          return;
-        }
+      // ── Step 2: Look up role in the users collection ────────────────────
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", email.trim().toLowerCase()));
+      const snap = await getDocs(q);
 
-        let finalUid = matchedUser.uid;
-        try {
-          const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import("firebase/auth");
-          const { auth } = await import("../../firebase/firebase");
-          const { doc, setDoc } = await import("firebase/firestore");
-          
-          let userCredential;
-          try {
-            // 1. Try to sign in with standard Firebase Email/Password Auth
-            userCredential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password.trim());
-            console.log("Logged in existing Firebase Auth user:", userCredential.user.uid);
-          } catch (signInErr) {
-            // 2. If user doesn't exist, automatically register them in Firebase Auth
-            if (
-              signInErr.code === "auth/user-not-found" || 
-              signInErr.code === "auth/invalid-credential" ||
-              signInErr.code === "auth/invalid-email"
-            ) {
-              try {
-                userCredential = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password.trim());
-                console.log("Registered new Firebase Auth user on-the-fly:", userCredential.user.uid);
-              } catch (createErr) {
-                console.warn("Auto-registration in Firebase Auth failed:", createErr);
-                throw createErr;
-              }
-            } else {
-              throw signInErr;
-            }
-          }
-          
-          finalUid = userCredential.user.uid;
-          
-          // Write the role to the /users collection under this authenticated UID
-          await setDoc(doc(db, "users", finalUid), {
-            uid: finalUid,
-            name: matchedUser.name,
-            email: matchedUser.email,
-            photoURL: matchedUser.photoURL || null,
-            role: matchedUser.role, // "admin" or "employee"
-            createdAt: new Date().toISOString(),
-          });
-          console.log("Successfully authenticated staff session in Firebase Auth:", finalUid);
-        } catch (authErr) {
-          console.warn("Firebase Auth Email/Password authentication failed, using local mock fallback:", authErr);
-        }
+      let userDoc = null;
+      if (!snap.empty) {
+        userDoc = snap.docs[0].data();
+      }
 
-        const sessionPayload = {
-          uid: finalUid,
-          name: matchedUser.name,
-          email: matchedUser.email,
-          role: matchedUser.role,
-          photoURL: matchedUser.photoURL || null,
-          isStaff: true,
-        };
-
-        // Persist session
-        localStorage.setItem("ky_admin_session", JSON.stringify(sessionPayload));
-        
-        toast.success(`Welcome back, ${matchedUser.name}! 🌿`);
-        
-        // Use full reload to securely sync AppContext on boot
-        window.location.href = "/admin";
-      } else {
-        toast.error("Invalid email or password", {
+      // ── Step 3: Verify role is admin or employee ────────────────────────
+      const role = userDoc?.role;
+      if (!role || (role !== "admin" && role !== "employee")) {
+        // Signed in to Firebase Auth but not a staff member
+        await auth.signOut();
+        toast.error("Access denied. This account does not have staff privileges.", {
           style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
         });
+        return;
       }
+
+      if (userDoc?.active === false) {
+        await auth.signOut();
+        toast.error("Access denied. Your account has been suspended.", {
+          style: { borderRadius: "12px", background: "#EF4444", color: "#fff" },
+        });
+        return;
+      }
+
+      // ── Step 4: Upsert users doc to ensure uid is synced ────────────────
+      await setDoc(doc(db, "users", firebaseUid), {
+        uid: firebaseUid,
+        name: userDoc?.name || userCredential.user.displayName || "Admin",
+        email: email.trim().toLowerCase(),
+        photoURL: userCredential.user.photoURL || null,
+        role,
+        active: true,
+      }, { merge: true });
+
+      // ── Step 5: Save session to localStorage ────────────────────────────
+      const sessionPayload = {
+        uid: firebaseUid,
+        name: userDoc?.name || userCredential.user.displayName || "Admin",
+        email: email.trim().toLowerCase(),
+        role,
+        photoURL: userCredential.user.photoURL || null,
+        isStaff: true,
+      };
+      localStorage.setItem("ky_admin_session", JSON.stringify(sessionPayload));
+
+      toast.success(`Welcome back, ${sessionPayload.name}! 🌿`);
+      window.location.href = "/admin";
+
     } catch (err) {
-      console.error("Custom login error:", err);
-      toast.error("Login verification failed. Check database connection.");
+      console.error("Admin login error:", err);
+      toast.error("Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div

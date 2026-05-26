@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
 import { db } from "../firebase/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import toast from "react-hot-toast";
 
 // ─── All Indian states ──────────────────────────────────────────────────────
@@ -14,39 +14,6 @@ const INDIAN_STATES = [
   "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
   "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
 ];
-
-// ─── Reusable input field ───────────────────────────────────────────────────
-const InputField = ({
-  label,
-  name,
-  type = "text",
-  placeholder,
-  value,
-  onChange,
-  required = false,
-  maxLength,
-  pattern,
-  hint,
-}) => (
-  <div>
-    <label htmlFor={name} className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-      {label} {required && <span className="text-red-400">*</span>}
-    </label>
-    <input
-      id={name}
-      name={name}
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-      required={required}
-      maxLength={maxLength}
-      pattern={pattern}
-      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white text-dark placeholder-gray-300 outline-none focus:border-primary transition-colors text-sm"
-    />
-    {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
-  </div>
-);
 
 // ─── Initial form state ─────────────────────────────────────────────────────
 const initialForm = {
@@ -63,15 +30,56 @@ const initialForm = {
 
 const AddAddress = () => {
   const { user, navigate } = useAppContext();
+
+  // Read query params: ?id=addressId&back=/profile
+  const params = new URLSearchParams(window.location.search);
+  const editId = params.get("id");
+  const backUrl = params.get("back") || "/profile";
+  const isEditMode = Boolean(editId);
+
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(isEditMode);
   const [errors, setErrors] = useState({});
+
+  // ── Load existing address if editing ────────────────────────────────────
+  useEffect(() => {
+    if (!isEditMode) return;
+    const loadAddress = async () => {
+      try {
+        const snap = await getDoc(doc(db, "addresses", editId));
+        if (snap.exists()) {
+          const data = snap.data();
+          setForm({
+            fullName: data.fullName || "",
+            phone: data.phone || "",
+            addressLine1: data.addressLine1 || "",
+            addressLine2: data.addressLine2 || "",
+            landmark: data.landmark || "",
+            city: data.city || "",
+            state: data.state || "Kerala",
+            pincode: data.pincode || "",
+            isDefault: data.isDefault || false,
+          });
+        } else {
+          toast.error("Address not found");
+          navigate(backUrl);
+        }
+      } catch (err) {
+        console.error("Failed to load address:", err);
+        toast.error("Failed to load address");
+        navigate(backUrl);
+      } finally {
+        setLoadingEdit(false);
+      }
+    };
+    loadAddress();
+  }, [editId]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
-    // Clear error on change
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -96,11 +104,14 @@ const AddAddress = () => {
       toast.error("Please fix the errors before saving");
       return;
     }
+    if (!user) {
+      toast.error("Please sign in to save an address");
+      return;
+    }
 
     setSaving(true);
     try {
-      // Save to Firestore /addresses collection
-      await addDoc(collection(db, "addresses"), {
+      const payload = {
         userId: user.uid,
         fullName: form.fullName.trim(),
         phone: form.phone.trim(),
@@ -111,30 +122,54 @@ const AddAddress = () => {
         state: form.state,
         pincode: form.pincode.trim(),
         isDefault: form.isDefault,
-        createdAt: serverTimestamp(),
-      });
-      toast.success("Address saved successfully! 🏠", {
-        style: { background: "#1B6B3A", color: "#fff", borderRadius: "12px" },
-      });
-      navigate("/cart");
+      };
+
+      if (isEditMode) {
+        await updateDoc(doc(db, "addresses", editId), {
+          ...payload,
+          updatedAt: serverTimestamp(),
+        });
+        toast.success("Address updated! 🏠", {
+          style: { background: "#1B6B3A", color: "#fff", borderRadius: "12px" },
+        });
+      } else {
+        await addDoc(collection(db, "addresses"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+        });
+        toast.success("Address saved! 🏠", {
+          style: { background: "#1B6B3A", color: "#fff", borderRadius: "12px" },
+        });
+      }
+      navigate(backUrl);
     } catch (err) {
-      // Fallback when Firebase is placeholder
-      console.warn("Firestore unavailable, using fallback:", err.message);
-      toast.success("Address saved! 🏠", {
-        style: { background: "#1B6B3A", color: "#fff", borderRadius: "12px" },
-      });
-      navigate("/cart");
+      console.error("Failed to save address:", err);
+      toast.error("Failed to save address. Please try again.");
     } finally {
       setSaving(false);
     }
   };
+
+  if (loadingEdit) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-20 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-gray-400">
+          <svg className="w-8 h-8 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="text-sm">Loading address…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 animate-fade-in">
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="mb-8">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(backUrl)}
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary font-medium mb-4 cursor-pointer transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -143,7 +178,7 @@ const AddAddress = () => {
           Back
         </button>
         <h1 className="text-2xl md:text-3xl font-bold text-dark">
-          Add Shipping <span className="text-primary">Address</span>
+          {isEditMode ? "Edit" : "Add"} Shipping <span className="text-primary">Address</span>
         </h1>
         <p className="text-gray-500 text-sm mt-1">
           All fields marked with <span className="text-red-400">*</span> are required
@@ -186,9 +221,7 @@ const AddAddress = () => {
               <div className={`flex items-center rounded-xl border-2 bg-white overflow-hidden transition-colors ${
                 errors.phone ? "border-red-300" : "border-gray-200 focus-within:border-primary"
               }`}>
-                <span className="px-3 py-3 text-sm text-gray-500 bg-gray-50 border-r border-gray-200 font-medium">
-                  +91
-                </span>
+                <span className="px-3 py-3 text-sm text-gray-500 bg-gray-50 border-r border-gray-200 font-medium">+91</span>
                 <input
                   id="phone"
                   name="phone"
@@ -320,18 +353,10 @@ const AddAddress = () => {
                 >
                   <option value="">Select state…</option>
                   {INDIAN_STATES.map((state) => (
-                    <option key={state} value={state}>
-                      {state}
-                    </option>
+                    <option key={state} value={state}>{state}</option>
                   ))}
                 </select>
-                <svg
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
+                <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                 </svg>
               </div>
@@ -348,11 +373,9 @@ const AddAddress = () => {
                   onChange={handleChange}
                   className="sr-only"
                 />
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
-                    form.isDefault ? "bg-primary border-primary" : "border-gray-300 bg-white group-hover:border-primary"
-                  }`}
-                >
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                  form.isDefault ? "bg-primary border-primary" : "border-gray-300 bg-white group-hover:border-primary"
+                }`}>
                   {form.isDefault && (
                     <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -380,12 +403,12 @@ const AddAddress = () => {
                   Saving…
                 </span>
               ) : (
-                "Save Address 🏠"
+                isEditMode ? "Update Address 🏠" : "Save Address 🏠"
               )}
             </button>
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(backUrl)}
               className="px-6 py-3.5 rounded-xl border-2 border-gray-200 text-gray-500 font-semibold hover:border-gray-300 hover:bg-gray-50 transition cursor-pointer"
             >
               Cancel
@@ -394,7 +417,6 @@ const AddAddress = () => {
         </div>
       </form>
 
-      {/* Kerala note */}
       <div className="mt-6 flex items-center gap-2 text-xs text-gray-400 justify-center">
         <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />

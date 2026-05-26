@@ -171,7 +171,7 @@ const Navbar = () => {
                       </p>
                     </div>
                     {[
-                      { label: 'My Orders', to: '/orders' },
+                      { label: 'My Orders', to: '/my-orders' },
                       { label: 'My Profile', to: '/profile' },
                     ].map(({ label, to }) => (
                       <Link
@@ -310,7 +310,7 @@ const Navbar = () => {
                     </div>
                   </div>
                   {[
-                    { label: 'My Orders', to: '/orders' },
+                    { label: 'My Orders', to: '/my-orders' },
                     { label: 'My Profile', to: '/profile' },
                   ].map(({ label, to }) => (
                     <Link

@@ -66,9 +66,9 @@ const Staff = () => {
 
   // Fetch staff list in real-time
   useEffect(() => {
-    const staffRef = collection(db, "staff");
+    const usersRef = collection(db, "users");
     const unsub = onSnapshot(
-      staffRef,
+      usersRef,
       (snapshot) => {
         const list = [];
         snapshot.forEach((docSnap) => {
@@ -145,7 +145,7 @@ const Staff = () => {
         createdAt: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, "staff", docId), payload, { merge: true });
+      await setDoc(doc(db, "users", docId), payload, { merge: true });
       toast.success(isEditing ? "Staff user updated!" : "Staff user registered successfully! 🌿");
       setModalOpen(false);
     } catch (err) {
@@ -167,7 +167,7 @@ const Staff = () => {
     }
 
     try {
-      await updateDoc(doc(db, "staff", member.id), {
+      await updateDoc(doc(db, "users", member.id), {
         active: !member.active,
       });
       toast.success(`User status updated to ${!member.active ? "ACTIVE" : "SUSPENDED"}`);
@@ -190,7 +190,7 @@ const Staff = () => {
     }
 
     try {
-      await deleteDoc(doc(db, "staff", deleteTarget.id));
+      await deleteDoc(doc(db, "users", deleteTarget.id));
       toast.success(`Account for "${deleteTarget.name}" permanently deleted`);
       setDeleteTarget(null);
     } catch (err) {

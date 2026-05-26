@@ -14,10 +14,10 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
-import { dummyOrders } from "../../assets/keralaData";
 import toast from "react-hot-toast";
+
 
 // Curated status colors matching the theme
 const STATUS_COLORS = {
@@ -42,6 +42,9 @@ const ORDER_STATUS_FLOW = [
   "cancelled",
 ];
 
+const normalizeOrderStatus = (status = "placed") =>
+  status.toString().toLowerCase().trim().replace(/\s+/g, "-") || "placed";
+
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,37 +53,24 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  // Load orders in real-time, auto-seed if empty
+  // Load orders in real-time from Firestore
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "orders"), async (snapshot) => {
-      if (snapshot.empty) {
-        console.log("Seeding mock orders into Firestore...");
-        setOrders(dummyOrders);
-        setLoading(false);
-        try {
-          for (const o of dummyOrders) {
-            await setDoc(doc(db, "orders", o.id), {
-              ...o,
-              createdAt: o.createdAt || new Date().toISOString(),
-              updatedAt: o.updatedAt || new Date().toISOString(),
-            });
-          }
-        } catch (err) {
-          console.error("Mock orders seeding failed:", err);
-        }
-      } else {
-        const orderList = [];
-        snapshot.forEach((doc) => {
-          orderList.push({ ...doc.data(), id: doc.id });
+    const unsub = onSnapshot(collection(db, "orders"), (snapshot) => {
+      const orderList = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        orderList.push({
+          ...data,
+          id: d.id,
+          status: normalizeOrderStatus(data.status),
         });
-        // Sort orders by date descending
-        orderList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setOrders(orderList);
-        setLoading(false);
-      }
+      });
+      // Sort by date descending — newest first
+      orderList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setOrders(orderList);
+      setLoading(false);
     }, (error) => {
-      console.warn("Orders sync failed (using local fallback data):", error);
-      setOrders(dummyOrders);
+      console.error("Orders sync failed:", error);
       setLoading(false);
     });
 
@@ -101,30 +91,35 @@ const Orders = () => {
 
   // Update order status
   const handleUpdateStatus = async (orderId, newStatus) => {
+    const nextStatus = normalizeOrderStatus(newStatus);
+    const previousOrders = orders;
+    const previousSelectedOrder = selectedOrder;
+    const updatedAt = new Date().toISOString();
+
     setUpdatingStatus(true);
 
-    // Optimistic Update: Update React state immediately
     setOrders((prevOrders) =>
       prevOrders.map((o) =>
         o.id === orderId
-          ? { ...o, status: newStatus, updatedAt: new Date().toISOString() }
+          ? { ...o, status: nextStatus, updatedAt }
           : o
       )
     );
     if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
+      setSelectedOrder((prev) => ({ ...prev, status: nextStatus, updatedAt }));
     }
 
     try {
       await updateDoc(doc(db, "orders", orderId), {
-        status: newStatus,
-        updatedAt: new Date().toISOString(),
+        status: nextStatus,
+        updatedAt,
       });
-      toast.success(`Order status updated to "${newStatus.replace(/-/g, " ")}"`);
+      toast.success(`Order status updated to "${nextStatus.replace(/-/g, " ")}"`);
     } catch (err) {
-      console.warn("Firestore updateDoc status error (falling back to mock state):", err);
-      // Fallback is already handled by optimistic state above, just toast success
-      toast.success(`Order status updated to "${newStatus.replace(/-/g, " ")}"`);
+      console.error("Firestore updateDoc status error:", err);
+      setOrders(previousOrders);
+      setSelectedOrder(previousSelectedOrder);
+      toast.error("Could not save order status. Please check Firestore rules and try again.");
     } finally {
       setUpdatingStatus(false);
     }
@@ -133,54 +128,63 @@ const Orders = () => {
   // Toggle payment status
   const handleTogglePayment = async (orderId, currentStatus) => {
     const nextStatus = currentStatus === "paid" ? "pending" : "paid";
+    const previousOrders = orders;
+    const previousSelectedOrder = selectedOrder;
+    const updatedAt = new Date().toISOString();
 
-    // Optimistic Update: Update React state immediately
     setOrders((prevOrders) =>
       prevOrders.map((o) =>
         o.id === orderId
-          ? { ...o, paymentStatus: nextStatus, updatedAt: new Date().toISOString() }
+          ? { ...o, paymentStatus: nextStatus, updatedAt }
           : o
       )
     );
     if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => ({ ...prev, paymentStatus: nextStatus }));
+      setSelectedOrder((prev) => ({ ...prev, paymentStatus: nextStatus, updatedAt }));
     }
 
     try {
       await updateDoc(doc(db, "orders", orderId), {
         paymentStatus: nextStatus,
-        updatedAt: new Date().toISOString(),
+        updatedAt,
       });
       toast.success(`Payment status marked as ${nextStatus.toUpperCase()}`);
     } catch (err) {
-      console.warn("Firestore updateDoc payment status error (falling back to mock state):", err);
-      toast.success(`Payment status marked as ${nextStatus.toUpperCase()}`);
+      console.error("Firestore updateDoc payment status error:", err);
+      setOrders(previousOrders);
+      setSelectedOrder(previousSelectedOrder);
+      toast.error("Could not save payment status. Please try again.");
     }
   };
 
   // Update payment method
   const handleUpdatePaymentMethod = async (orderId, newMethod) => {
-    // Optimistic Update: Update React state immediately
+    const previousOrders = orders;
+    const previousSelectedOrder = selectedOrder;
+    const updatedAt = new Date().toISOString();
+
     setOrders((prevOrders) =>
       prevOrders.map((o) =>
         o.id === orderId
-          ? { ...o, paymentMethod: newMethod, updatedAt: new Date().toISOString() }
+          ? { ...o, paymentMethod: newMethod, updatedAt }
           : o
       )
     );
     if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => ({ ...prev, paymentMethod: newMethod }));
+      setSelectedOrder((prev) => ({ ...prev, paymentMethod: newMethod, updatedAt }));
     }
 
     try {
       await updateDoc(doc(db, "orders", orderId), {
         paymentMethod: newMethod,
-        updatedAt: new Date().toISOString(),
+        updatedAt,
       });
       toast.success(`Payment method updated to "${newMethod}"`);
     } catch (err) {
-      console.warn("Firestore updateDoc payment method error (falling back to mock state):", err);
-      toast.success(`Payment method updated to "${newMethod}"`);
+      console.error("Firestore updateDoc payment method error:", err);
+      setOrders(previousOrders);
+      setSelectedOrder(previousSelectedOrder);
+      toast.error("Could not save payment method. Please try again.");
     }
   };
 
@@ -300,7 +304,6 @@ const Orders = () => {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredOrders.map((order) => {
-                  const statusColor = STATUS_COLORS[order.status] || "bg-gray-100 text-gray-600";
                   return (
                     <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
                       {/* ID */}

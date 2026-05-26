@@ -15,49 +15,12 @@ import {
 import {
   collection,
   onSnapshot,
-  doc,
-  setDoc,
   query,
   where,
   getDocs,
 } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import toast from "react-hot-toast";
-
-const MOCK_CUSTOMERS = [
-  {
-    uid: "user_demo_001",
-    name: "Priya Menon",
-    email: "priya.menon@example.com",
-    role: "customer",
-    photoURL: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&h=120&fit=crop&q=80",
-    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    uid: "user_demo_002",
-    name: "Arjun Nair",
-    email: "arjun.nair@example.com",
-    role: "customer",
-    photoURL: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&q=80",
-    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    uid: "user_demo_003",
-    name: "Kavitha Pillai",
-    email: "kavitha.pillai@example.com",
-    role: "customer",
-    photoURL: "https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=120&h=120&fit=crop&q=80",
-    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    uid: "user_demo_004",
-    name: "Deepak Varma",
-    email: "deepak.varma@example.com",
-    role: "customer",
-    photoURL: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&q=80",
-    createdAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
 
 // Curated status colors matching standard order timelines
 const STATUS_COLORS = {
@@ -85,31 +48,15 @@ const Customers = () => {
 
   // Load real-time users & orders from Firestore
   useEffect(() => {
-    // 1. Listen to customers
-    const unsubUsers = onSnapshot(collection(db, "customers"), async (snapshot) => {
-      if (snapshot.empty || snapshot.size <= 1) {
-        console.log("Seeding mock customer base...");
-        try {
-          for (const c of MOCK_CUSTOMERS) {
-            await setDoc(doc(db, "customers", c.uid), {
-              ...c,
-              createdAt: c.createdAt || new Date().toISOString(),
-            });
-          }
-        } catch (err) {
-          console.error("Failed seeding customers:", err);
-        }
-      } else {
-        const userList = [];
-        snapshot.forEach((docSnap) => {
-          userList.push({ ...docSnap.data(), uid: docSnap.id });
-        });
-        setUsers(userList);
-      }
+    // 1. Listen to customers (real data only — no mock seeding)
+    const unsubUsers = onSnapshot(collection(db, "customers"), (snapshot) => {
+      const userList = [];
+      snapshot.forEach((docSnap) => {
+        userList.push({ ...docSnap.data(), uid: docSnap.id });
+      });
+      setUsers(userList);
     }, (err) => {
-      console.warn("Failed to subscribe to customers collection:", err);
-      // Fallback: populate with mock data so dashboard remains fully interactive
-      setUsers(MOCK_CUSTOMERS);
+      console.error("Failed to subscribe to customers collection:", err);
       setLoading(false);
     });
 

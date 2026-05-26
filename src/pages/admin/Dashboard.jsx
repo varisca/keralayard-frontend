@@ -98,9 +98,9 @@ const Dashboard = () => {
       }
     );
 
-    // 2. Listen to users (customers) in real-time
+    // 2. Listen to customers in real-time
     const unsubUsers = onSnapshot(
-      collection(db, "users"),
+      collection(db, "customers"),
       (snapshot) => {
         const userList = [];
         snapshot.forEach((doc) => {
@@ -110,7 +110,7 @@ const Dashboard = () => {
         setLoading(false);
       },
       (error) => {
-        console.warn("Users sync failed for dashboard:", error);
+        console.warn("Customers sync failed for dashboard:", error);
         setLoading(false);
       }
     );

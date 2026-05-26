@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
-import { dummyAddresses } from "../assets/keralaData";
+import { db } from "../firebase/firebase";
+import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import toast from "react-hot-toast";
+import AddressModal from "../components/AddressModal";
 
 // ─── Avatar initials helper ────────────────────────────────────────────────
 const getInitials = (name) => {
@@ -30,8 +32,37 @@ const Profile = () => {
   const [phoneEditing, setPhoneEditing] = useState(false);
   const [savingPhone, setSavingPhone] = useState(false);
 
-  // Use dummy addresses since Firestore is placeholder
-  const addresses = dummyAddresses;
+  // ── Real addresses from Firestore ─────────────────────────────────────────
+  const [addresses, setAddresses] = useState([]);
+  const [addressesLoading, setAddressesLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Reusable Address Modal popup states
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editAddressId, setEditAddressId] = useState(null);
+
+  useEffect(() => {
+    if (!displayUser) {
+      setAddressesLoading(false);
+      return;
+    }
+    const q = query(collection(db, "addresses"), where("userId", "==", displayUser.uid));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Show default address first
+        list.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
+        setAddresses(list);
+        setAddressesLoading(false);
+      },
+      (err) => {
+        console.error("Failed to load addresses:", err);
+        setAddressesLoading(false);
+      }
+    );
+    return () => unsub();
+  }, [displayUser?.uid]);
 
   const handleSavePhone = async () => {
     if (!/^[6-9]\d{9}$/.test(phone)) {
@@ -39,16 +70,25 @@ const Profile = () => {
       return;
     }
     setSavingPhone(true);
-    // TODO: save to Firestore user doc when Firebase is configured
     await new Promise((r) => setTimeout(r, 600));
     setSavingPhone(false);
     setPhoneEditing(false);
     toast.success("Phone number updated!");
   };
 
-  const handleDeleteAddress = (id) => {
-    // TODO: delete from Firestore when Firebase is configured
-    toast.success("Address removed (demo mode)");
+  // ── Delete address ────────────────────────────────────────────────────────
+  const handleDeleteAddress = async (id) => {
+    if (!window.confirm("Delete this address?")) return;
+    setDeletingId(id);
+    try {
+      await deleteDoc(doc(db, "addresses", id));
+      toast.success("Address deleted");
+    } catch (err) {
+      console.error("Failed to delete address:", err);
+      toast.error("Failed to delete address. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleLogout = async () => {
@@ -63,10 +103,7 @@ const Profile = () => {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center">
         <p className="text-gray-500 mb-4">Please log in to view your profile.</p>
-        <button
-          onClick={() => navigate("/")}
-          className="btn-primary px-6 py-2 rounded-xl"
-        >
+        <button onClick={() => navigate("/")} className="btn-primary px-6 py-2 rounded-xl">
           Go Home
         </button>
       </div>
@@ -78,19 +115,19 @@ const Profile = () => {
       {/* ── Profile header ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
         {/* Green banner */}
-        <div className="h-24 kerala-gradient relative">
+        <div className="h-24 kerala-gradient relative z-0">
           <div className="absolute inset-0 opacity-10"
             style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }}
           />
         </div>
 
-        <div className="px-6 pb-6 -mt-12 flex flex-col sm:flex-row sm:items-end gap-4">
+        <div className="relative z-10 px-6 pb-6 -mt-12 flex flex-col sm:flex-row sm:items-end gap-4">
           {/* Avatar */}
           {displayUser.photoURL ? (
             <img
               src={displayUser.photoURL}
               alt={displayUser.displayName}
-              className="w-24 h-24 rounded-full border-4 border-white shadow-lg flex-shrink-0"
+              className="w-24 h-24 rounded-full border-4 border-white shadow-lg flex-shrink-0 object-cover"
             />
           ) : (
             <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-primary flex items-center justify-center flex-shrink-0">
@@ -251,9 +288,14 @@ const Profile = () => {
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-bold text-dark flex items-center gap-2">
                 <span>📍</span> My Addresses
+                {addresses.length > 0 && (
+                  <span className="text-xs bg-gray-100 text-gray-500 font-semibold px-2 py-0.5 rounded-full">
+                    {addresses.length}
+                  </span>
+                )}
               </h2>
               <button
-                onClick={() => navigate("/add-address")}
+                onClick={() => { setEditAddressId(null); setIsAddressModalOpen(true); }}
                 className="btn-primary px-4 py-2 text-sm rounded-xl flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -264,13 +306,21 @@ const Profile = () => {
             </div>
 
             <div className="p-6">
-              {addresses.length === 0 ? (
-                <div className="text-center py-10">
-                  <span className="text-4xl">📭</span>
-                  <p className="text-gray-400 mt-3 mb-4">No saved addresses yet</p>
+              {addressesLoading ? (
+                <div className="flex items-center justify-center py-12 gap-3 text-gray-400">
+                  <svg className="w-5 h-5 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-sm">Loading addresses…</span>
+                </div>
+              ) : addresses.length === 0 ? (
+                <div className="text-center py-12">
+                  <span className="text-5xl">📭</span>
+                  <p className="text-gray-400 mt-3 mb-5 text-sm">No saved addresses yet</p>
                   <button
-                    onClick={() => navigate("/add-address")}
-                    className="btn-primary px-6 py-2 rounded-xl text-sm"
+                    onClick={() => { setEditAddressId(null); setIsAddressModalOpen(true); }}
+                    className="btn-primary px-6 py-2.5 rounded-xl text-sm"
                   >
                     Add Your First Address
                   </button>
@@ -291,25 +341,47 @@ const Profile = () => {
                           Default
                         </span>
                       )}
-                      <p className="font-bold text-dark">{addr.fullName}</p>
+                      <p className="font-bold text-dark pr-16">{addr.fullName}</p>
                       <p className="text-sm text-gray-500 mt-1 leading-relaxed">
                         {[addr.addressLine1, addr.addressLine2, addr.city, addr.state, addr.pincode]
                           .filter(Boolean)
                           .join(", ")}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">📱 {addr.phone}</p>
+                      {addr.landmark && (
+                        <p className="text-xs text-gray-400 mt-0.5">📌 Near {addr.landmark}</p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">📱 +91 {addr.phone}</p>
                       <div className="flex gap-3 mt-3">
                         <button
-                          onClick={() => navigate("/add-address")}
-                          className="text-xs text-primary font-semibold hover:underline cursor-pointer"
+                          onClick={() => { setEditAddressId(addr.id); setIsAddressModalOpen(true); }}
+                          className="text-xs text-primary font-semibold hover:underline cursor-pointer flex items-center gap-1"
                         >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                          </svg>
                           Edit
                         </button>
                         <button
                           onClick={() => handleDeleteAddress(addr.id)}
-                          className="text-xs text-red-400 font-semibold hover:underline cursor-pointer"
+                          disabled={deletingId === addr.id}
+                          className="text-xs text-red-400 font-semibold hover:underline cursor-pointer flex items-center gap-1 disabled:opacity-50"
                         >
-                          Delete
+                          {deletingId === addr.id ? (
+                            <>
+                              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Deleting…
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                              </svg>
+                              Delete
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -399,6 +471,15 @@ const Profile = () => {
           </button>
         </div>
       </div>
+
+      {/* Reusable Address Modal Popup */}
+      <AddressModal
+        isOpen={isAddressModalOpen}
+        onClose={() => setIsAddressModalOpen(false)}
+        onSuccess={undefined} // Real-time onSnapshot in Profile automatically updates
+        editAddressId={editAddressId}
+        userId={displayUser?.uid}
+      />
     </div>
   );
 };

@@ -1,35 +1,35 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
-import { dummyOrders } from "../assets/keralaData";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase/firebase";
+import { db, auth } from "../firebase/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 // ── Order status pipeline ────────────────────────────────────────────────
 const STATUS_STEPS = [
   "placed",
   "confirmed",
+  "processing",
   "packed",
-  "out for delivery",
+  "shipped",
+  "out-for-delivery",
   "delivered",
 ];
 
 const STATUS_LABELS = {
   placed: "Placed",
   confirmed: "Confirmed",
+  processing: "Processing",
   packed: "Packed",
-  "out for delivery": "Out for Delivery",
+  shipped: "Shipped",
+  "out-for-delivery": "Out for Delivery",
   delivered: "Delivered",
-  shipped: "Out for Delivery", // alias
-  processing: "Confirmed",     // alias
   cancelled: "Cancelled",
 };
 
 // Normalise status string to one of our known keys
 const normaliseStatus = (raw = "") => {
-  const s = raw.toLowerCase().trim();
-  if (s === "shipped") return "out for delivery";
-  if (s === "processing") return "confirmed";
+  const s = raw.toString().toLowerCase().trim().replace(/\s+/g, "-");
+  if (s === "order-placed") return "placed";
   return s;
 };
 
@@ -42,7 +42,8 @@ const StatusBadge = ({ status }) => {
     placed: "bg-blue-100 text-blue-600 border-blue-200",
     confirmed: "bg-yellow-100 text-yellow-700 border-yellow-200",
     packed: "bg-orange-100 text-orange-600 border-orange-200",
-    "out for delivery": "bg-purple-100 text-purple-600 border-purple-200",
+    shipped: "bg-pink-100 text-pink-600 border-pink-200",
+    "out-for-delivery": "bg-purple-100 text-purple-600 border-purple-200",
   };
   const cls =
     configs[s] || "bg-gray-100 text-gray-600 border-gray-200";
@@ -61,17 +62,17 @@ const StatusTimeline = ({ status }) => {
   const currentIdx = STATUS_STEPS.indexOf(normStatus);
 
   return (
-    <div className="mt-4 overflow-x-auto">
-      <div className="flex items-center min-w-max gap-0">
+    <div className="mt-4 w-full overflow-hidden">
+      <div className="flex items-start w-full gap-0">
         {STATUS_STEPS.map((step, idx) => {
           const isCompleted = idx < currentIdx;
           const isCurrent = idx === currentIdx;
           const isLast = idx === STATUS_STEPS.length - 1;
 
           return (
-            <div key={step} className="flex items-center">
+            <div key={step} className={`flex items-start min-w-0 ${isLast ? "flex-none" : "flex-1"}`}>
               {/* Step dot */}
-              <div className="flex flex-col items-center gap-1">
+              <div className="flex w-10 flex-shrink-0 flex-col items-center gap-1">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all ${
                     isCompleted
@@ -94,7 +95,7 @@ const StatusTimeline = ({ status }) => {
                   )}
                 </div>
                 <span
-                  className={`text-[10px] font-medium text-center max-w-[64px] leading-tight ${
+                  className={`text-[10px] font-medium text-center w-16 -mx-3 leading-tight ${
                     isCurrent
                       ? "text-primary font-bold"
                       : isCompleted
@@ -109,7 +110,7 @@ const StatusTimeline = ({ status }) => {
               {/* Connector line */}
               {!isLast && (
                 <div
-                  className={`h-0.5 w-10 sm:w-14 mx-1 rounded-full transition-all ${
+                  className={`h-0.5 flex-1 min-w-3 mx-2 mt-4 rounded-full transition-all ${
                     isCompleted ? "bg-primary" : "bg-gray-200"
                   }`}
                 />
@@ -142,7 +143,10 @@ const ActiveOrderCard = ({ order, currency }) => {
       <div className="bg-primary/5 border-b border-primary/10 px-5 py-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs text-gray-400 font-medium mb-0.5">ORDER ID</p>
-          <p className="text-sm font-bold text-dark font-mono">#{order.id}</p>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-dark font-mono">#{order.id}</span>
+            <StatusBadge status={order.status} />
+          </div>
         </div>
         <div className="text-right">
           <p className="text-xs text-gray-400 font-medium mb-0.5">ORDER DATE</p>
@@ -296,62 +300,56 @@ const HistoryOrderCard = ({ order, currency }) => {
 
 // ── Main Component ────────────────────────────────────────────────────────
 const MyOrders = () => {
-  const { user, currency, navigate } = useAppContext();
-  const displayUser = user && !user.isStaff ? user : null;
+  const { currency, navigate } = useAppContext();
 
-  // Use dummyOrders as initial state (Firebase is placeholder)
-  const [orders, setOrders] = useState(dummyOrders);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!displayUser) {
-      // Still show demo orders for unauthenticated preview
-      setOrders(dummyOrders);
-      setLoading(false);
-      return;
-    }
+    let unsubOrders = null;
 
-    // Attempt real-time Firestore listener
-    let unsubscribe = () => {};
-    try {
+    // onAuthStateChanged fires immediately with current auth state
+    // (or null) and re-fires on every auth change — fully reactive.
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      // Clean up any previous orders listener
+      if (unsubOrders) {
+        unsubOrders();
+        unsubOrders = null;
+      }
+
+      const uid = firebaseUser?.uid;
+      if (!uid) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
       const q = query(
         collection(db, "orders"),
-        where("userId", "==", displayUser.uid)
+        where("userId", "==", uid)
       );
-      unsubscribe = onSnapshot(
+
+      unsubOrders = onSnapshot(
         q,
         (snapshot) => {
-          if (snapshot.empty) {
-            // No real orders yet — keep dummies for demo
-            setOrders(dummyOrders);
-          } else {
-            const realOrders = snapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            }));
-            // Sort newest first
-            realOrders.sort(
-              (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-            );
-            setOrders(realOrders);
-          }
+          const realOrders = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+          realOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          setOrders(realOrders);
           setLoading(false);
         },
         (err) => {
           console.error("Orders listener error:", err);
-          // Fallback to dummy data
-          setOrders(dummyOrders);
+          setOrders([]);
           setLoading(false);
         }
       );
-    } catch (err) {
-      console.error("Firestore setup error:", err);
-      setOrders(dummyOrders);
-      setLoading(false);
-    }
+    });
 
-    return () => unsubscribe();
-  }, [displayUser]);
+    return () => {
+      unsubAuth();
+      if (unsubOrders) unsubOrders();
+    };
+  }, []); // onAuthStateChanged handles all auth reactivity — no deps needed
 
   // Split orders by active vs history
   const activeOrders = orders.filter((o) => {
@@ -368,7 +366,7 @@ const MyOrders = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-warm pt-10 pb-16">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="skeleton h-8 w-40 rounded mb-8" />
           {Array.from({ length: 2 }).map((_, i) => (
             <div
@@ -407,7 +405,7 @@ const MyOrders = () => {
 
   return (
     <div className="min-h-screen bg-warm pt-8 pb-20">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
 
         {/* ── Page Header ─────────────────────────────────────────── */}
         <div className="mb-10">

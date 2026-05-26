@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useAppContext } from "../context/AppContext";
-import { dummyProducts, dummyAddresses } from "../assets/keralaData";
+import { dummyProducts } from "../assets/keralaData";
 import { db } from "../firebase/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import toast from "react-hot-toast";
+import AddressModal from "../components/AddressModal";
 
 // ─── Placeholder image for products without images ─────────────────────────
 const PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%23F0F4F0'/%3E%3Ctext x='40' y='44' font-size='28' text-anchor='middle' fill='%231B6B3A'%3E🛒%3C/text%3E%3C/svg%3E";
@@ -40,40 +41,48 @@ const Cart = () => {
   const [addresses, setAddresses] = useState([]);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [showAddressDropdown, setShowAddressDropdown] = useState(false);
-  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(true);
+  
+  // Reusable Address Modal popup states
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editAddressId, setEditAddressId] = useState(null);
 
-  // ── Load addresses from Firestore or fall back to dummyAddresses ───────────
-  const loadAddresses = useCallback(async () => {
-    if (!displayUser) return;
+  // ── Real-time address listener (no extra getDocs round-trip) ──────────────
+  useEffect(() => {
+    if (!displayUser) {
+      setAddresses([]);
+      setSelectedAddress(null);
+      setAddressLoading(false);
+      return;
+    }
     setAddressLoading(true);
-    try {
-      const q = query(
-        collection(db, "addresses"),
-        where("userId", "==", displayUser.uid)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
+    const q = query(
+      collection(db, "addresses"),
+      where("userId", "==", displayUser.uid)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
         const addrs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setAddresses(addrs);
-        const def = addrs.find((a) => a.isDefault) || addrs[0];
-        setSelectedAddress(def);
-      } else {
-        // Fallback to dummy addresses for demo
-        setAddresses(dummyAddresses);
-        setSelectedAddress(dummyAddresses[0]);
+        // Auto-select default or first address (only when no address is selected yet)
+        setSelectedAddress((prev) => {
+          if (prev) {
+            // Keep selection if it still exists in the updated list
+            const stillExists = addrs.find((a) => a.id === prev.id);
+            return stillExists || addrs.find((a) => a.isDefault) || addrs[0] || null;
+          }
+          return addrs.find((a) => a.isDefault) || addrs[0] || null;
+        });
+        setAddressLoading(false);
+      },
+      (err) => {
+        console.error("Failed to load addresses:", err);
+        setAddressLoading(false);
       }
-    } catch (err) {
-      // Firebase placeholder — use dummy data
-      setAddresses(dummyAddresses);
-      setSelectedAddress(dummyAddresses[0]);
-    } finally {
-      setAddressLoading(false);
-    }
-  }, [displayUser]);
-
-  useEffect(() => {
-    loadAddresses();
-  }, [loadAddresses]);
+    );
+    return () => unsub();
+  }, [displayUser?.uid]);
 
   // ── Pricing calculations ───────────────────────────────────────────────────
   const subtotal = getCartAmount();
@@ -315,16 +324,25 @@ const Cart = () => {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     📍 Delivery Address
                   </p>
-                  <button
-                    onClick={() => setShowAddressDropdown((v) => !v)}
-                    className="text-xs text-primary font-semibold hover:underline cursor-pointer"
-                  >
-                    {showAddressDropdown ? "Close" : "Change"}
-                  </button>
+                  {addresses.length > 0 ? (
+                    <button
+                      onClick={() => setShowAddressDropdown((v) => !v)}
+                      className="text-xs text-primary font-semibold hover:underline cursor-pointer"
+                    >
+                      {showAddressDropdown ? "Close" : "Change"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setEditAddressId(null); setIsAddressModalOpen(true); }}
+                      className="text-xs text-primary font-semibold hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      ➕ Add
+                    </button>
+                  )}
                 </div>
 
                 {addressLoading ? (
-                  <div className="skeleton h-10 rounded-lg" />
+                  <div className="skeleton h-10 rounded-lg animate-pulse" />
                 ) : selectedAddress ? (
                   <div>
                     <p className="font-semibold text-dark text-sm">{selectedAddress.fullName}</p>
@@ -334,11 +352,20 @@ const Cart = () => {
                     <p className="text-gray-400 text-xs mt-0.5">📱 {selectedAddress.phone}</p>
                   </div>
                 ) : (
-                  <p className="text-gray-400 text-sm">No address selected</p>
+                  <div className="py-2 flex flex-col gap-2">
+                    <p className="text-gray-400 text-xs italic leading-tight">No saved addresses found. Please add one to proceed.</p>
+                    <button
+                      type="button"
+                      onClick={() => { setEditAddressId(null); setIsAddressModalOpen(true); }}
+                      className="w-full btn-primary py-2 text-xs rounded-xl font-bold flex items-center justify-center gap-1 cursor-pointer active:scale-95 transition-all"
+                    >
+                      ➕ Add Delivery Address
+                    </button>
+                  </div>
                 )}
 
                 {/* Address dropdown */}
-                {showAddressDropdown && (
+                {showAddressDropdown && addresses.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden animate-scale-in">
                     {addresses.map((addr) => (
                       <button
@@ -358,7 +385,7 @@ const Cart = () => {
                       </button>
                     ))}
                     <button
-                      onClick={() => { navigate("/add-address"); setShowAddressDropdown(false); }}
+                      onClick={() => { setEditAddressId(null); setIsAddressModalOpen(true); setShowAddressDropdown(false); }}
                       className="w-full text-left px-4 py-3 text-sm text-primary font-semibold hover:bg-primary/5 transition-colors cursor-pointer border-t border-gray-100 flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -422,6 +449,18 @@ const Cart = () => {
           </div>
         </div>
       </div>
+      
+      {/* Reusable Address Modal Popup */}
+      <AddressModal
+        isOpen={isAddressModalOpen}
+        onClose={() => setIsAddressModalOpen(false)}
+        onSuccess={(savedAddr) => {
+          // onSnapshot already refreshed the list; just select immediately
+          if (savedAddr) setSelectedAddress(savedAddr);
+        }}
+        editAddressId={editAddressId}
+        userId={displayUser?.uid}
+      />
     </div>
   );
 };

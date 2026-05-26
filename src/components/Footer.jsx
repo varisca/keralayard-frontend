@@ -20,7 +20,7 @@ const Footer = () => {
 
   const customerCare = [
     { label: 'My Account', to: '/profile' },
-    { label: 'My Orders', to: '/orders' },
+    { label: 'My Orders', to: '/my-orders' },
     { label: 'Track Order', to: '/track' },
     { label: 'Return Policy', to: '/returns' },
     { label: 'Privacy Policy', to: '/privacy' },
