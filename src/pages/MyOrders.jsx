@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { useAppContext } from "../context/AppContext";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import toast from "react-hot-toast";
+
+const CANCELLATION_WINDOW_MS = 12 * 60 * 60 * 1000;
 
 // ── Order status pipeline ────────────────────────────────────────────────
 const STATUS_STEPS = [
@@ -21,6 +24,26 @@ const normaliseStatus = (raw = "") => {
   if (s === "delivered") return "delivered";
   if (s === "cancelled") return "cancelled";
   return "placed";
+};
+
+const getOrderDateMillis = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (value instanceof Date) return value.getTime();
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const getCancellationInfo = (order, now = Date.now()) => {
+  const createdAtMs = getOrderDateMillis(order.createdAt);
+  const status = normaliseStatus(order.status);
+  const deadlineMs = createdAtMs + CANCELLATION_WINDOW_MS;
+  const isFinal = status === "delivered" || status === "cancelled";
+
+  return {
+    canCancel: Boolean(createdAtMs) && !isFinal && now <= deadlineMs,
+    remainingMs: Math.max(0, deadlineMs - now),
+  };
 };
 
 const STATUS_LABELS = {
@@ -100,16 +123,29 @@ const StatusTimeline = ({ status }) => {
 // ── Format date ──────────────────────────────────────────────────────────
 const formatDate = (iso) => {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", {
+  const millis = getOrderDateMillis(iso);
+  if (!millis) return "-";
+  return new Date(millis).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 };
 
+const formatRemainingTime = (ms) => {
+  const totalMinutes = Math.ceil(ms / (60 * 1000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours <= 0) return `${minutes}m left`;
+  if (minutes === 0) return `${hours}h left`;
+  return `${hours}h ${minutes}m left`;
+};
+
 // ── Active Order Card ─────────────────────────────────────────────────────
-const ActiveOrderCard = ({ order, currency }) => {
+const ActiveOrderCard = ({ order, currency, now, cancelling, onCancel }) => {
   const totalItems = order.items?.reduce((sum, i) => sum + (i.qty || i.quantity || 1), 0) || 0;
+  const cancellation = getCancellationInfo(order, now);
 
   return (
     <div className="bg-white rounded-2xl border border-primary/20 shadow-sm overflow-hidden mb-6 animate-fade-in-up">
@@ -169,6 +205,24 @@ const ActiveOrderCard = ({ order, currency }) => {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p className="text-xs text-gray-500">
+          {cancellation.canCancel
+            ? `You can cancel this order for ${formatRemainingTime(cancellation.remainingMs)}.`
+            : "The 12-hour cancellation window has closed."}
+        </p>
+        {cancellation.canCancel && (
+          <button
+            type="button"
+            onClick={() => onCancel(order)}
+            disabled={cancelling}
+            className="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-red-200 text-red-600 bg-white text-sm font-semibold hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed transition"
+          >
+            {cancelling ? "Cancelling..." : "Cancel Order"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -278,6 +332,8 @@ const MyOrders = () => {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(Date.now());
+  const [cancellingOrderId, setCancellingOrderId] = useState("");
 
   useEffect(() => {
     let unsubOrders = null;
@@ -307,7 +363,7 @@ const MyOrders = () => {
         q,
         (snapshot) => {
           const realOrders = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-          realOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          realOrders.sort((a, b) => getOrderDateMillis(b.createdAt) - getOrderDateMillis(a.createdAt));
           setOrders(realOrders);
           setLoading(false);
         },
@@ -324,6 +380,49 @@ const MyOrders = () => {
       if (unsubOrders) unsubOrders();
     };
   }, []); // onAuthStateChanged handles all auth reactivity — no deps needed
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleCancelOrder = async (order) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      toast.error("Please sign in to cancel your order");
+      return;
+    }
+
+    if (order.userId && order.userId !== currentUser.uid) {
+      toast.error("You can only cancel your own orders");
+      return;
+    }
+
+    if (!getCancellationInfo(order).canCancel) {
+      toast.error("Orders can only be cancelled within 12 hours of placing them");
+      return;
+    }
+
+    const confirmed = window.confirm("Cancel this order? This action cannot be undone.");
+    if (!confirmed) return;
+
+    setCancellingOrderId(order.id);
+    try {
+      const timestamp = new Date().toISOString();
+      await updateDoc(doc(db, "orders", order.id), {
+        status: "cancelled",
+        cancelledAt: timestamp,
+        cancelledBy: currentUser.uid,
+        updatedAt: timestamp,
+      });
+      toast.success("Order cancelled successfully");
+    } catch (err) {
+      console.error("Order cancellation failed:", err);
+      toast.error("Failed to cancel order. Please try again.");
+    } finally {
+      setCancellingOrderId("");
+    }
+  };
 
   // Split orders by active vs history
   const activeOrders = orders.filter((o) => {
@@ -405,6 +504,9 @@ const MyOrders = () => {
                 key={order.id}
                 order={order}
                 currency={currency}
+                now={now}
+                cancelling={cancellingOrderId === order.id}
+                onCancel={handleCancelOrder}
               />
             ))}
           </section>

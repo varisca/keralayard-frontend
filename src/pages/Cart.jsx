@@ -112,9 +112,8 @@ const Cart = () => {
 
   // ── Pricing calculations ───────────────────────────────────────────────────
   const subtotal = getCartAmount();
-  const deliveryCharge = subtotal > 0 && subtotal < 299 ? 40 : 0;
-  const tax = Math.round(subtotal * 0.02 * 100) / 100;
-  const total = Math.round((subtotal + deliveryCharge + tax) * 100) / 100;
+  const deliveryCharge = subtotal > 0 && subtotal < 1000 ? 40 : 0;
+  const total = Math.round((subtotal + deliveryCharge) * 100) / 100;
 
   // ── Proceed to checkout ────────────────────────────────────────────────────
   const handleProceed = () => {
@@ -207,32 +206,32 @@ const Cart = () => {
               return (
                 <div
                   key={product.id}
-                  className="py-4 md:grid md:grid-cols-[3fr_1fr_1fr_auto] md:gap-4 md:items-center flex flex-col gap-3 animate-fade-in"
+                  className="relative my-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm animate-fade-in md:my-0 md:grid md:grid-cols-[3fr_1fr_1fr_auto] md:items-center md:gap-4 md:rounded-none md:border-0 md:border-b md:border-gray-100 md:bg-transparent md:px-0 md:py-4 md:shadow-none"
                 >
                   {/* Product info */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-start gap-3 pr-9 md:items-center md:gap-4 md:pr-0">
                     <div
                       onClick={() => {
                         navigate(`/products/${product.categoryName?.toLowerCase().replace(/\s+/g, "-") || "all"}/${product.id}`);
                         window.scrollTo(0, 0);
                       }}
-                      className="cursor-pointer w-20 h-20 flex-shrink-0 rounded-xl bg-warm-dark overflow-hidden border border-gray-200 hover:border-primary transition"
+                      className="cursor-pointer w-16 h-16 md:w-20 md:h-20 flex-shrink-0 rounded-xl bg-warm-dark overflow-hidden border border-gray-200 hover:border-primary transition"
                     >
                       <img
                         src={imageUrl || PLACEHOLDER}
                         alt={product.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain p-2"
                         onError={(e) => { e.target.src = PLACEHOLDER; }}
                       />
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-dark text-sm leading-tight line-clamp-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-dark text-sm leading-tight line-clamp-2 md:text-base">
                         {product.name}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
                         {product.weight && formatWeight(product.weight, product.quantity)}
                       </p>
-                      <p className="text-primary font-bold text-sm mt-1">
+                      <p className="text-primary font-bold text-sm mt-1 md:text-base">
                         {currency}{product.sellingPrice}
                       </p>
                       {/* Mobile subtotal */}
@@ -243,8 +242,9 @@ const Cart = () => {
                   </div>
 
                   {/* Quantity controls — Blinkit style */}
-                  <div className="flex md:justify-center">
-                    <div className="inline-flex items-center border-2 border-primary rounded-xl overflow-hidden">
+                  <div className="mt-3 flex items-center justify-between md:mt-0 md:justify-center">
+                    <p className="text-xs text-gray-500 md:hidden">Qty</p>
+                    <div className="inline-flex items-center border border-primary rounded-lg overflow-hidden">
                       <button
                         onClick={() => {
                           if (product.quantity === 1) {
@@ -254,17 +254,17 @@ const Cart = () => {
                             updateCartItem(product.id, product.quantity - 1);
                           }
                         }}
-                        className="w-9 h-9 flex items-center justify-center text-primary font-bold text-lg hover:bg-primary hover:text-white transition-colors cursor-pointer"
+                        className="w-10 h-9 flex items-center justify-center text-primary font-bold text-lg hover:bg-primary/10 transition-colors cursor-pointer"
                         aria-label="Decrease quantity"
                       >
-                        −
+                        -
                       </button>
-                      <span className="w-9 h-9 flex items-center justify-center font-bold text-primary text-sm select-none">
+                      <span className="w-10 h-9 flex items-center justify-center font-bold text-primary text-sm select-none border-x border-primary">
                         {product.quantity}
                       </span>
                       <button
                         onClick={() => updateCartItem(product.id, product.quantity + 1)}
-                        className="w-9 h-9 flex items-center justify-center text-primary font-bold text-lg hover:bg-primary hover:text-white transition-colors cursor-pointer"
+                        className="w-10 h-9 flex items-center justify-center text-primary font-bold text-lg hover:bg-primary/10 transition-colors cursor-pointer"
                         aria-label="Increase quantity"
                       >
                         +
@@ -283,7 +283,7 @@ const Cart = () => {
                       updateCartItem(product.id, 0);
                       toast.success("Item removed", { icon: "🗑️" });
                     }}
-                    className="self-start md:self-center p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition cursor-pointer"
+                    className="absolute right-2 top-2 rounded-lg p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 transition cursor-pointer md:static md:self-center"
                     aria-label="Remove item"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -331,13 +331,13 @@ const Cart = () => {
                 </div>
                 {deliveryCharge > 0 && (
                   <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-                    🚚 Add {currency}{299 - subtotal} more for free delivery
+                    Free delivery on orders of {currency}1000 or more.
                   </p>
                 )}
-                <div className="flex justify-between text-gray-600">
+                {/* <div className="flex justify-between text-gray-600">
                   <span>Tax (2%)</span>
                   <span className="font-medium text-dark">{currency}{tax}</span>
-                </div>
+                </div> */}
                 <div className="border-t border-dashed border-gray-200 pt-3 flex justify-between">
                   <span className="font-bold text-dark text-base">Total</span>
                   <span className="font-bold text-primary text-lg">{currency}{total}</span>
@@ -465,7 +465,7 @@ const Cart = () => {
             {[
               { icon: "🌿", label: "100% Authentic" },
               { icon: "🚚", label: "Fast Delivery" },
-              { icon: "↩️", label: "Easy Returns" },
+              // { icon: "↩️", label: "Easy Returns" },
             ].map(({ icon, label }) => (
               <div key={label} className="flex flex-col items-center gap-1">
                 <span className="text-xl">{icon}</span>

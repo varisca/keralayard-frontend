@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import ProductCard from "../components/ProductCard";
-import { dummyProducts, categories } from "../assets/keralaData";
+import SEO from "../components/SEO";
+import { dummyProducts, categories as staticCategories } from "../assets/keralaData";
 
-// ── Skeleton placeholder card ─────────────────────────────────────────────
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col gap-3 animate-pulse">
     <div className="skeleton h-36 w-full rounded-lg" />
@@ -17,195 +17,264 @@ const SkeletonCard = () => (
   </div>
 );
 
-const AllProducts = () => {
-  const { products, productsLoading, searchQuery, setSearchQuery, navigate } =
-    useAppContext();
+const normalise = (value = "") => (value ?? "").toString().trim().toLowerCase();
 
-  // Use context products; fall back to keralaData dummies so the page is never empty
-  const sourceProducts =
-    products && products.length > 0 ? products : dummyProducts;
+const slugify = (value = "") =>
+  normalise(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+const isVisibleProduct = (product) =>
+  product.active !== false &&
+  product.isActive !== false &&
+  product.status !== "inactive" &&
+  product.status !== "draft";
+
+const getCategoryTokens = (category = {}) =>
+  [
+    category.id,
+    category.docId,
+    category.slug,
+    category.name,
+    slugify(category.slug),
+    slugify(category.name),
+  ]
+    .filter(Boolean)
+    .map(normalise);
+
+const getProductCategoryTokens = (product = {}) =>
+  [
+    product.categoryId,
+    product.categoryDocId,
+    product.categorySlug,
+    product.categoryName,
+    product.category,
+    product.category?.id,
+    product.category?.slug,
+    product.category?.name,
+    slugify(product.categoryName),
+    slugify(product.category),
+  ]
+    .filter(Boolean)
+    .map(normalise);
+
+const productMatchesCategory = (product, category) => {
+  const productTokens = getProductCategoryTokens(product);
+  const categoryTokens = getCategoryTokens(category);
+  return productTokens.some((token) => categoryTokens.includes(token));
+};
+
+const AllProducts = () => {
+  const {
+    products,
+    productsLoading,
+    searchQuery,
+    setSearchQuery,
+    categories,
+  } = useAppContext();
+
+  const sourceProducts = products && products.length > 0 ? products : dummyProducts;
+  const activeCategories =
+    categories && categories.length > 0 ? categories : staticCategories;
 
   const [activeCategory, setActiveCategory] = useState("all");
   const [filtered, setFiltered] = useState(sourceProducts);
   const [localSearch, setLocalSearch] = useState(searchQuery || "");
 
-  // Sync external searchQuery into local state (e.g. typed in Navbar)
+  const categoryCounts = useMemo(() => {
+    const counts = { all: 0 };
+    sourceProducts
+      .filter(isVisibleProduct)
+      .forEach((product) => {
+        counts.all += 1;
+        activeCategories.forEach((cat) => {
+          if (productMatchesCategory(product, cat)) {
+            counts[cat.id] = (counts[cat.id] || 0) + 1;
+          }
+        });
+      });
+    return counts;
+  }, [activeCategories, sourceProducts]);
+
   useEffect(() => {
     setLocalSearch(searchQuery || "");
   }, [searchQuery]);
 
-  // Re-filter whenever source data, search, or category changes
   useEffect(() => {
-    // Only show active products on storefront
-    let result = sourceProducts.filter((p) => p.active !== false);
+    let result = sourceProducts.filter(isVisibleProduct);
+    const categoryObj = activeCategories.find((c) => c.id === activeCategory);
 
-    if (activeCategory !== "all") {
-      result = result.filter(
-        (p) =>
-          p.categoryId === activeCategory ||
-          p.categoryName?.toLowerCase() ===
-            categories
-              .find((c) => c.id === activeCategory)
-              ?.name?.toLowerCase()
-      );
+    if (categoryObj) {
+      result = result.filter((p) => productMatchesCategory(p, categoryObj));
     }
 
     if (localSearch.trim()) {
-      const q = localSearch.trim().toLowerCase();
+      const q = normalise(localSearch);
       result = result.filter(
         (p) =>
-          p.name?.toLowerCase().includes(q) ||
-          p.categoryName?.toLowerCase().includes(q) ||
-          p.tags?.some((t) => t.toLowerCase().includes(q))
+          normalise(p.name).includes(q) ||
+          normalise(p.categoryName).includes(q) ||
+          normalise(p.category).includes(q) ||
+          normalise(p.description).includes(q) ||
+          p.tags?.some((tag) => normalise(tag).includes(q))
       );
     }
 
     setFiltered(result);
-  }, [sourceProducts, activeCategory, localSearch]);
+  }, [sourceProducts, activeCategories, activeCategory, localSearch]);
 
   const handleSearchChange = (e) => {
-    const val = e.target.value;
-    setLocalSearch(val);
-    setSearchQuery(val); // keep context in sync
+    const value = e.target.value;
+    setLocalSearch(value);
+    setSearchQuery(value);
   };
 
-  const handleCategoryClick = (catId) => {
-    setActiveCategory(catId);
-  };
+  const selectedCategory = activeCategories.find((c) => c.id === activeCategory);
 
   return (
-    <div className="min-h-screen bg-warm pt-15 md:pt-15 pb-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-warm pb-24 md:pt-8 md:pb-16">
+      <SEO
+        title="Shop Kerala Products Online"
+        description="Browse Kerala Yard products online, including banana chips, coconut oil, spices, pickles, breakfast mixes, and homemade Kerala snacks."
+        keywords="shop Kerala products online, Kerala groceries, banana chips online, coconut oil online, Kerala spices, Kerala snacks"
+      />
 
-        {/* ── Page Header ───────────────────────────────────────────── */}
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-dark">
+      <div className="max-w-7xl mx-auto">
+        <div className="px-4 sm:px-6 lg:px-8 pt-6 md:pt-0 pb-5">
+          <h1 className="text-2xl md:text-4xl font-bold text-dark">
             All Kerala Products
           </h1>
           <p className="text-gray-500 mt-1 text-sm md:text-base">
             Authentic flavours from God's Own Country, delivered to your door.
           </p>
           <div className="w-16 h-1 bg-primary rounded-full mt-3" />
-        </div>
 
-        {/* ── Search Bar ────────────────────────────────────────────── */}
-        <div className="relative mb-6 max-w-xl">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+          <div className="relative mt-6 max-w-xl">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+              />
+            </svg>
+            <input
+              type="text"
+              value={localSearch}
+              onChange={handleSearchChange}
+              placeholder="Search products, categories, tags..."
+              className="w-full pl-10 pr-10 py-3 rounded-xl border border-gray-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
             />
-          </svg>
-          <input
-            type="text"
-            value={localSearch}
-            onChange={handleSearchChange}
-            placeholder="Search products, categories, tags…"
-            className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
-          />
-          {localSearch && (
-            <button
-              onClick={() => {
-                setLocalSearch("");
-                setSearchQuery("");
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-              aria-label="Clear search"
-            >
-              ✕
-            </button>
-          )}
+            {localSearch && (
+              <button
+                onClick={() => {
+                  setLocalSearch("");
+                  setSearchQuery("");
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                aria-label="Clear search"
+              >
+                x
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* ── Category Filter Pills ──────────────────────────────────── */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-8">
-          {/* All pill */}
-          <button
-            onClick={() => handleCategoryClick("all")}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-              activeCategory === "all"
-                ? "bg-primary text-white border-primary shadow-md"
-                : "bg-white text-gray-600 border-gray-200 hover:border-primary/50 hover:text-primary"
-            }`}
-          >
-            🛒 All
-          </button>
+        <div className="grid grid-cols-[92px_minmax(0,1fr)] md:grid-cols-[220px_minmax(0,1fr)] border-t border-gray-200 bg-white md:rounded-2xl md:border md:shadow-sm md:mx-6 lg:mx-8">
+          <aside className="bg-gray-50 border-r border-gray-200">
+            <div className="sticky top-0 md:top-24 max-h-[calc(100vh-88px)] overflow-y-auto">
+              <button
+                onClick={() => setActiveCategory("all")}
+                className={`w-full min-h-[78px] md:min-h-0 md:py-4 px-2 md:px-4 flex flex-col md:flex-row items-center md:items-start justify-center md:justify-between gap-1 md:gap-3 text-center md:text-left border-b border-gray-200 transition ${
+                  activeCategory === "all"
+                    ? "bg-white text-primary border-l-4 border-l-primary"
+                    : "text-gray-600 hover:bg-white"
+                }`}
+              >
+                <span className="text-lg md:hidden">All</span>
+                <span className="text-xs md:text-sm font-semibold leading-tight">All</span>
+                <span className="hidden md:inline text-xs text-gray-400">{categoryCounts.all || 0}</span>
+              </button>
 
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => handleCategoryClick(cat.id)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                activeCategory === cat.id
-                  ? "bg-primary text-white border-primary shadow-md"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-primary/50 hover:text-primary"
-              }`}
-            >
-              <span>{cat.icon}</span>
-              {cat.name}
-            </button>
-          ))}
+              {activeCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={`w-full min-h-[86px] md:min-h-0 md:py-4 px-2 md:px-4 flex flex-col md:flex-row items-center md:items-start justify-center md:justify-between gap-1 md:gap-3 text-center md:text-left border-b border-gray-200 transition ${
+                    activeCategory === cat.id
+                      ? "bg-white text-primary border-l-4 border-l-primary"
+                      : "text-gray-600 hover:bg-white"
+                  }`}
+                >
+                  <span className="text-xl leading-none">{cat.icon || ""}</span>
+                  <span className="flex-1 text-[11px] md:text-sm font-semibold leading-tight line-clamp-2">
+                    {cat.name}
+                  </span>
+                  <span className="hidden md:inline text-xs text-gray-400">
+                    {categoryCounts[cat.id] || 0}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <main className="min-w-0 p-3 md:p-6">
+            {!productsLoading && (
+              <div className="mb-4">
+                <h2 className="text-base md:text-xl font-bold text-dark">
+                  {selectedCategory?.name || "All Products"}
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {filtered.length} product{filtered.length !== 1 ? "s" : ""} found
+                </p>
+              </div>
+            )}
+
+            {productsLoading && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            )}
+
+            {!productsLoading && filtered.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <span className="text-5xl mb-4">{selectedCategory?.icon || ""}</span>
+                <h3 className="text-lg font-semibold text-dark mb-2">
+                  No products found
+                </h3>
+                <p className="text-gray-500 text-sm mb-6 max-w-xs">
+                  Try another category or clear your search.
+                </p>
+                <button
+                  onClick={() => {
+                    setLocalSearch("");
+                    setSearchQuery("");
+                    setActiveCategory("all");
+                  }}
+                  className="btn-primary px-6 py-2.5 text-sm"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+
+            {!productsLoading && filtered.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                {filtered.map((product) => (
+                  <ProductCard key={product.id || product._id} product={product} />
+                ))}
+              </div>
+            )}
+          </main>
         </div>
-
-        {/* ── Results Count ─────────────────────────────────────────── */}
-        {!productsLoading && (
-          <p className="text-xs text-gray-500 mb-4">
-            {filtered.length} product{filtered.length !== 1 ? "s" : ""} found
-            {activeCategory !== "all"
-              ? ` in "${categories.find((c) => c.id === activeCategory)?.name}"`
-              : ""}
-            {localSearch ? ` for "${localSearch}"` : ""}
-          </p>
-        )}
-
-        {/* ── Loading Skeletons ──────────────────────────────────────── */}
-        {productsLoading && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
-        )}
-
-        {/* ── Empty State ────────────────────────────────────────────── */}
-        {!productsLoading && filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <span className="text-7xl mb-4">🌿</span>
-            <h3 className="text-xl font-semibold text-dark mb-2">
-              No products found
-            </h3>
-            <p className="text-gray-500 text-sm mb-6 max-w-xs">
-              We couldn't find what you're looking for. Try a different search
-              term or browse all categories.
-            </p>
-            <button
-              onClick={() => {
-                setLocalSearch("");
-                setSearchQuery("");
-                setActiveCategory("all");
-              }}
-              className="btn-primary px-6 py-2.5 text-sm"
-            >
-              Clear filters
-            </button>
-          </div>
-        )}
-
-        {/* ── Product Grid ───────────────────────────────────────────── */}
-        {!productsLoading && filtered.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
-            {filtered.map((product) => (
-              <ProductCard key={product.id || product._id} product={product} />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

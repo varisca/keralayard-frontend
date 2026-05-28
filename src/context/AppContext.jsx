@@ -166,7 +166,8 @@ export const AppContextProvider = ({ children }) => {
       } else {
         const catList = [];
         snapshot.forEach((doc) => {
-          catList.push({ ...doc.data(), id: doc.id });
+          const data = doc.data();
+          catList.push({ ...data, id: data.id || doc.id, docId: doc.id });
         });
         setCategories(catList);
         setCategoriesLoading(false);
@@ -205,7 +206,8 @@ export const AppContextProvider = ({ children }) => {
       } else {
         const prodList = [];
         snapshot.forEach((doc) => {
-          prodList.push({ ...doc.data(), id: doc.id });
+          const data = doc.data();
+          prodList.push({ ...data, id: data.id || doc.id, docId: doc.id });
         });
         setProducts(prodList);
         setProductsLoading(false);

@@ -117,6 +117,12 @@ const Checkout = () => {
   const [confirmed, setConfirmed] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
 
+  useEffect(() => {
+    if (confirmed) {
+      window.scrollTo(0, 0);
+    }
+  }, [confirmed]);
+
   // ── Load addresses ─ real-time so newly added addresses appear instantly ──────────
   const [addressesLoading, setAddressesLoading] = useState(true);
 
@@ -159,7 +165,7 @@ const Checkout = () => {
   const subtotal = getCartAmount();
   const deliveryCharge = subtotal > 0 && subtotal < 299 ? 40 : 0;
   const tax = Math.round(subtotal * 0.02 * 100) / 100;
-  const total = Math.round((subtotal + deliveryCharge + tax) * 100) / 100;
+  const total = Math.round((subtotal + deliveryCharge) * 100) / 100;
 
   // ── Place order ────────────────────────────────────────────────────────────
   const handlePlaceOrder = async () => {
@@ -425,10 +431,10 @@ const Checkout = () => {
                       <span className="font-medium text-dark">{currency}{deliveryCharge}</span>
                     )}
                   </div>
-                  <div className="flex justify-between text-gray-600">
+                  {/* <div className="flex justify-between text-gray-600">
                     <span>Tax (2%)</span>
                     <span className="font-medium text-dark">{currency}{tax}</span>
-                  </div>
+                  </div> */}
                   <div className="border-t border-dashed border-gray-200 pt-3 flex justify-between">
                     <span className="font-bold text-dark text-base">Total Payable</span>
                     <span className="font-bold text-primary text-xl">{currency}{total}</span>

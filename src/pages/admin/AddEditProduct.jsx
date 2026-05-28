@@ -191,7 +191,7 @@ const AddEditProduct = () => {
 
     setSaving(true);
     try {
-      const productId = id || `prod_${slug.replace(/-/g, "_")}`;
+      const productId = id || `prod_${slug.replace(/-/g, "_")}_${Date.now()}`;
 
       const tagArray = tags
         .split(",")

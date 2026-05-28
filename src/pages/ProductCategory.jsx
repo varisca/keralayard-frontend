@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
 import ProductCard from "../components/ProductCard";
+import SEO from "../components/SEO";
 import { dummyProducts, categories as staticCategories } from "../assets/keralaData";
 
 // ── Skeleton placeholder card ─────────────────────────────────────────────
@@ -65,9 +66,23 @@ const ProductCategory = () => {
 
   const displayName = categoryObj?.name || category || "Category";
   const displayIcon = categoryObj?.icon || "🌿";
+  const seoDescription = `Shop authentic Kerala ${displayName.toLowerCase()} online at Kerala Yard. Freshly packed Kerala groceries and traditional products delivered to your door.`;
+  const categorySchema = categoryObj && {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: `${displayName} - Kerala Yard`,
+    description: seoDescription,
+    url: `${window.location.origin}/products/${categoryObj.slug || category}`,
+  };
 
   return (
     <div className="min-h-screen bg-warm pt-36 md:pt-40 pb-16">
+      <SEO
+        title={`${displayName} Online`}
+        description={seoDescription}
+        keywords={`${displayName}, Kerala ${displayName}, buy ${displayName} online, Kerala groceries online`}
+        jsonLd={categorySchema}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* ── Breadcrumb ────────────────────────────────────────────── */}

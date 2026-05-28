@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -59,14 +59,20 @@ const navLinks = [
 
 const AdminLayout = () => {
   const { user, logout } = useAppContext();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const isEmployee = user?.role === "employee";
-  const filteredNavLinks = navLinks.filter((link) => {
-    if (link.path === "/admin/customers" && isEmployee) return false;
-    if (link.path === "/admin/users" && isEmployee) return false;
-    return true;
-  });
+  const filteredNavLinks = isEmployee
+    ? navLinks.filter((link) => link.path === "/admin/orders")
+    : navLinks;
+
+  useEffect(() => {
+    if (isEmployee && location.pathname !== "/admin/orders") {
+      navigate("/admin/orders", { replace: true });
+    }
+  }, [isEmployee, location.pathname, navigate]);
 
   const displayName = user?.name || user?.displayName || "Admin";
   const initials = displayName
@@ -235,7 +241,7 @@ const AdminLayout = () => {
             </button>
             <div>
               <p className="text-gray-800 font-semibold text-sm md:text-base">
-                Hello, Admin 👋
+                Hello, {isEmployee ? "Employee" : "Admin"} 👋
               </p>
               <p className="text-gray-400 text-xs hidden md:block">
                 {new Date().toLocaleDateString("en-IN", {

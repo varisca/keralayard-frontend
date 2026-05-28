@@ -1,57 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
-import ProductCard from "../components/ProductCard";
+import SEO from "../components/SEO";
 import { dummyProducts, categories } from "../assets/keralaData";
-
-// ── Static star renderer ─────────────────────────────────────────────────
-const StarRating = ({ rating = 4.5, count = 128 }) => {
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex items-center gap-0.5">
-        {Array.from({ length: 5 }).map((_, i) => {
-          const filled = i < Math.floor(rating);
-          const halfFilled = !filled && i < rating;
-          return (
-            <svg
-              key={i}
-              className={`w-4 h-4 ${
-                filled
-                  ? "text-accent"
-                  : halfFilled
-                  ? "text-accent"
-                  : "text-gray-300"
-              }`}
-              fill={filled || halfFilled ? "currentColor" : "none"}
-              stroke="currentColor"
-              strokeWidth={filled || halfFilled ? 0 : 1.5}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-              />
-            </svg>
-          );
-        })}
-      </div>
-      <span className="text-sm font-semibold text-dark">{rating}</span>
-      <span className="text-xs text-gray-400">({count} reviews)</span>
-    </div>
-  );
-};
-
-// ── Discount badge ───────────────────────────────────────────────────────
-const DiscountBadge = ({ mrp, sellingPrice }) => {
-  if (!mrp || !sellingPrice || mrp <= sellingPrice) return null;
-  const pct = Math.round(((mrp - sellingPrice) / mrp) * 100);
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-500 text-white">
-      {pct}% OFF
-    </span>
-  );
-};
 
 const ProductDetails = () => {
   const { products, productsLoading, navigate, currency, addToCart, removeFromCart, cartItems } =
@@ -71,7 +22,6 @@ const ProductDetails = () => {
 
   const [mainImage, setMainImage] = useState(null);
   const [qty, setQty] = useState(0);
-  const [relatedProducts, setRelatedProducts] = useState([]);
 
   // Scroll to top on mount
   useEffect(() => {
@@ -92,19 +42,6 @@ const ProductDetails = () => {
       setQty(cartItems[pid] || 0);
     }
   }, [cartItems, product]);
-
-  // Similar products
-  useEffect(() => {
-    if (!product || !sourceProducts.length) return;
-    const catId = product.categoryId || product.category;
-    const similar = sourceProducts
-      .filter((p) => {
-        const pCatId = p.categoryId || p.category;
-        return pCatId === catId && (p.id || p._id) !== (product.id || product._id);
-      })
-      .slice(0, 4);
-    setRelatedProducts(similar);
-  }, [product, sourceProducts]);
 
   const handleAddToCart = () => {
     const pid = product.id || product._id;
@@ -130,6 +67,11 @@ const ProductDetails = () => {
   if (!productsLoading && !product) {
     return (
       <div className="min-h-screen bg-warm flex flex-col items-center justify-center py-24 text-center px-4">
+        <SEO
+          title="Product Not Found"
+          description="This Kerala Yard product is unavailable. Browse all Kerala groceries and traditional products online."
+          noIndex
+        />
         <span className="text-7xl mb-4">🌿</span>
         <h2 className="text-2xl font-bold text-dark mb-2">Product not found</h2>
         <p className="text-gray-500 text-sm mb-6">
@@ -161,9 +103,44 @@ const ProductDetails = () => {
     product.categoryName || product.category || categoryObj?.name || "";
   const categorySlug =
     categoryObj?.slug || categoryName.toLowerCase().replace(/\s+/g, "-");
+  const primaryImage = images.filter(Boolean)[0] || "/hero_banner.png";
+  const productDescription =
+    description ||
+    `Buy ${product.name} online from Kerala Yard. Authentic Kerala groceries delivered fresh.`;
+  const productSchema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: productDescription,
+    image: [`${window.location.origin}${primaryImage}`],
+    brand: {
+      "@type": "Brand",
+      name: "Kerala Yard",
+    },
+    category: categoryName,
+    sku: pid,
+    offers: {
+      "@type": "Offer",
+      url: `${window.location.origin}/products/${categorySlug}/${pid}`,
+      priceCurrency: "INR",
+      price: sellingPrice,
+      availability: inStock
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
+    },
+  };
 
   return (
     <div className="min-h-screen bg-warm pt-36 md:pt-20 pb-16">
+      <SEO
+        title={`${product.name} Online`}
+        description={productDescription.slice(0, 155)}
+        keywords={`${product.name}, ${categoryName}, buy ${product.name} online, Kerala groceries, Kerala Yard`}
+        image={primaryImage}
+        type="product"
+        jsonLd={productSchema}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* ── Breadcrumb ────────────────────────────────────────────── */}
@@ -259,11 +236,6 @@ const ProductDetails = () => {
             <h1 className="text-2xl md:text-3xl font-bold text-dark leading-snug mb-3">
               {product.name}
             </h1>
-
-            {/* Rating */}
-            <div className="mb-4">
-              <StarRating rating={4.5} count={128} />
-            </div>
 
             {/* Price row */}
             <div className="flex items-center gap-3 flex-wrap mb-2">
@@ -384,36 +356,6 @@ const ProductDetails = () => {
             </div>
           </div>
         </div>
-
-        {/* ── Similar Products ──────────────────────────────────────── */}
-        {relatedProducts.length > 0 && (
-          <div className="mt-20">
-            <div className="flex flex-col items-center mb-8">
-              <h2 className="text-2xl md:text-3xl font-bold text-dark">
-                Similar Products
-              </h2>
-              <div className="w-16 h-1 bg-primary rounded-full mt-2" />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
-              {relatedProducts.map((p) => (
-                <ProductCard key={p.id || p._id} product={p} />
-              ))}
-            </div>
-
-            <div className="flex justify-center mt-10">
-              <button
-                onClick={() => {
-                  navigate(`/products/${categorySlug}`);
-                  window.scrollTo(0, 0);
-                }}
-                className="border border-primary text-primary hover:bg-primary hover:text-white px-8 py-2.5 rounded-full text-sm font-medium transition-all"
-              >
-                See more in {categoryName} →
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

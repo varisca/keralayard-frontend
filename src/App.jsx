@@ -11,6 +11,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import Login from "./components/Login";
 import ScrollToTop from "./components/ScrollToTop";
+import SEO from "./components/SEO";
 
 // Customer Pages (lazy loaded)
 const Home = lazy(() => import("./pages/Home"));
@@ -37,6 +38,11 @@ const AdminStaff = lazy(() => import("./pages/admin/Staff"));
 const App = () => {
   const location = useLocation();
   const isAdminPath = location.pathname.startsWith("/admin");
+  const isPrivatePath =
+    isAdminPath ||
+    ["/cart", "/checkout", "/my-orders", "/profile", "/add-address"].some(
+      (path) => location.pathname.startsWith(path)
+    );
   const { showUserLogin, authLoading } = useAppContext();
 
   if (authLoading) return <Loading fullScreen />;
@@ -44,6 +50,13 @@ const App = () => {
   return (
     <div className="min-h-screen bg-white text-gray-800" style={{ fontFamily: "'Inter', sans-serif" }}>
       <ScrollToTop />
+      {isPrivatePath && (
+        <SEO
+          title="Kerala Yard"
+          description="Kerala Yard account, checkout, cart, and admin pages."
+          noIndex
+        />
+      )}
       {!isAdminPath && <Navbar />}
       {showUserLogin && <Login />}
 
