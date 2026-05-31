@@ -11,11 +11,15 @@ const Footer = () => {
   const quickLinks = [
     { label: 'Home', to: '/' },
     { label: 'Products', to: '/products' },
+    { label: 'About Us', to: '/about' },
   ];
 
   const customerCare = [
     { label: 'My Account', to: '/profile' },
     { label: 'My Orders', to: '/my-orders' },
+    { label: 'Return Policy', to: '/returns' },
+    { label: 'Privacy Policy', to: '/privacy' },
+    { label: 'Terms & Conditions', to: '/terms' },
   ];
 
   return (
@@ -136,12 +140,12 @@ const Footer = () => {
             <div className="mt-6 border-t border-white/10 pt-4 text-xs text-white/70 leading-relaxed">
               <p>© {new Date().getFullYear()} Kerala Yard. All rights reserved.</p>
               <p className="mt-1">
-                Made with <span style={{ color: '#D4A017' }}>heart</span> in God's Own Country
+                Made with <span style={{ color: '#D4A017' }}>♥️</span> in God's Own Country
               </p>
             </div>
           </div>
         </div>
-      </div>
+    </div>
     </footer>
   );
 };

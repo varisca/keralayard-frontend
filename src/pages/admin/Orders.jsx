@@ -288,7 +288,81 @@ const Orders = () => {
           <p className="font-medium">No orders matching the filters</p>
         </div>
       ) : (
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <>
+        <div className="md:hidden space-y-3">
+          {filteredOrders.map((order) => (
+            <div key={order.id} className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-bold text-gray-500 truncate">
+                    #{order.id.replace("order_", "").toUpperCase()}
+                  </p>
+                  <p className="font-semibold text-gray-900 mt-1 truncate">
+                    {order.address?.fullName || "Guest Customer"}
+                  </p>
+                  <p className="text-xs text-gray-500">{order.address?.phone || "N/A"}</p>
+                </div>
+                <p className="text-base font-bold text-[#1B6B3A] flex-shrink-0">
+                  {formatINR(order.amount)}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl bg-gray-50 p-2">
+                  <p className="text-gray-400 font-bold uppercase">Placed</p>
+                  <p className="text-gray-700 mt-0.5">{formatDate(order.createdAt)}</p>
+                </div>
+                <div className="rounded-xl bg-gray-50 p-2">
+                  <p className="text-gray-400 font-bold uppercase">Payment</p>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePayment(order.id, order.paymentStatus)}
+                    className={`mt-0.5 text-xs font-bold px-2 py-1 rounded-lg ${
+                      order.paymentStatus === "paid"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {order.paymentStatus?.toUpperCase() || "PENDING"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2">
+                <select
+                  value={order.status}
+                  disabled={updatingStatus}
+                  onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                >
+                  {ADMIN_STATUS_FLOW.map((s) => (
+                    <option key={s} value={s}>
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={displayPaymentMethod(order.paymentMethod)}
+                    onChange={(e) => handleUpdatePaymentMethod(order.id, e.target.value)}
+                    className="min-w-0 flex-1 px-3 py-2 text-xs font-semibold border border-gray-200 rounded-xl bg-white focus:outline-none"
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Online Payment">Online Payment</option>
+                  </select>
+                  <button
+                    onClick={() => setSelectedOrder(order)}
+                    className="h-9 w-9 inline-flex items-center justify-center bg-gray-50 hover:bg-[#1B6B3A]/10 hover:text-[#1B6B3A] text-gray-500 rounded-xl transition-colors"
+                    title="View Details"
+                  >
+                    <Eye size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -404,6 +478,7 @@ const Orders = () => {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* ── Order Detail Slide-Over Modal ── */}

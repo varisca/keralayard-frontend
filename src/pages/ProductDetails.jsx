@@ -132,7 +132,7 @@ const ProductDetails = () => {
   };
 
   return (
-    <div className="min-h-screen bg-warm pt-36 md:pt-20 pb-16">
+    <div className="min-h-screen bg-warm pt-6 md:pt-20 pb-16">
       <SEO
         title={`${product.name} Online`}
         description={productDescription.slice(0, 155)}
@@ -173,48 +173,22 @@ const ProductDetails = () => {
         <div className="flex flex-col md:flex-row gap-10 lg:gap-16">
 
           {/* ── LEFT: Image Gallery ────────────────────────────────── */}
-          <div className="flex flex-col gap-4 w-full md:w-5/12 lg:w-2/5">
-            {/* Main image */}
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex items-center justify-center p-6 shadow-sm min-h-[280px] md:min-h-[360px]">
-              {mainImage ? (
-                <img
-                  src={mainImage}
-                  alt={product.name}
-                  className="max-h-72 md:max-h-96 w-auto object-contain transition-all duration-300 hover:scale-105"
-                />
-              ) : (
-                <div className="flex flex-col items-center gap-3 text-gray-300">
-                  <span className="text-7xl">
-                    {categoryObj?.icon || "🌿"}
-                  </span>
-                  <span className="text-sm">No image available</span>
-                </div>
-              )}
-            </div>
-
-            {/* Thumbnails — only if more than 1 image */}
-            {images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                {images.map((img, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setMainImage(img)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-xl border-2 overflow-hidden bg-white transition-all ${
-                      mainImage === img
-                        ? "border-primary shadow-md"
-                        : "border-gray-200 hover:border-primary/50"
-                    }`}
-                  >
-                    <img
-                      src={img}
-                      alt={`Thumbnail ${i + 1}`}
-                      className="w-full h-full object-contain p-1"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <div
+  className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm"
+  style={{ height: "350px" }}
+>
+  {mainImage ? (
+    <img
+      src={mainImage}
+      alt={product.name}
+      className="w-full h-full object-cover transition-all duration-300 hover:scale-105"
+    />
+  ) : (
+    <div className="flex h-full items-center justify-center">
+      ...
+    </div>
+  )}
+</div>
 
           {/* ── RIGHT: Product Info ────────────────────────────────── */}
           <div className="flex flex-col w-full md:w-7/12 lg:w-3/5">

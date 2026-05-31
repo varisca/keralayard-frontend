@@ -313,7 +313,7 @@ const Categories = () => {
       {/* ── Add/Edit Category Modal ── */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-up">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden animate-fade-in-up flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-bold text-gray-800 text-lg">
@@ -328,7 +328,7 @@ const Categories = () => {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+            <form onSubmit={handleSave} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               {/* Category Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase">

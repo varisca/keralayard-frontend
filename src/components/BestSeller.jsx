@@ -120,25 +120,7 @@ const BestSeller = () => {
             Hand-picked authentic Kerala essentials
           </p>
         </div>
-        <Link
-          to="/products"
-          className="inline-flex items-center gap-1.5 text-[#1B6B3A] font-semibold text-sm hover:underline underline-offset-4 flex-shrink-0"
-        >
-          View All
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17 8l4 4m0 0l-4 4m4-4H3"
-            />
-          </svg>
-        </Link>
+       
       </div>
 
       {/* Grid */}
@@ -153,6 +135,28 @@ const BestSeller = () => {
           No featured products yet.
         </p>
       )}
+
+     <div className="flex justify-end">
+    <Link
+      to="/products"
+      className="inline-flex items-center gap-2 mt-8 px-4 py-2 bg-[#1B6B3A] text-white rounded-lg font-medium hover:bg-[#15582f] transition-colors"
+    >
+      View All
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M17 8l4 4m0 0l-4 4m4-4H3"
+        />
+      </svg>
+    </Link>
+</div>
     </section>
   )
 }

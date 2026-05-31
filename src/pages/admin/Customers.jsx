@@ -250,7 +250,46 @@ const Customers = () => {
         </div>
       ) : (
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="md:hidden divide-y divide-gray-100">
+            {filteredUsers.map((userStatsItem) => (
+              <button
+                key={userStatsItem.uid}
+                type="button"
+                onClick={() => {
+                  setSelectedCustomer(userStatsItem);
+                  setActiveTab("details");
+                }}
+                className="w-full text-left p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-100 shadow-sm">
+                  {userStatsItem.photoURL ? (
+                    <img src={userStatsItem.photoURL} alt={userStatsItem.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-[#1B6B3A] text-white flex items-center justify-center font-bold text-sm">
+                      {userStatsItem.name ? userStatsItem.name[0].toUpperCase() : "U"}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-gray-900 truncate">
+                    {userStatsItem.name || "Anonymous User"}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{userStatsItem.email}</p>
+                  <div className="flex items-center gap-2 mt-2 text-xs">
+                    <span className="px-2 py-1 rounded-lg bg-gray-100 text-gray-600 font-semibold">
+                      {userStatsItem.orderCount} orders
+                    </span>
+                    <span className="px-2 py-1 rounded-lg bg-green-50 text-[#1B6B3A] font-bold">
+                      {formatINR(userStatsItem.totalSpend)}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
+              </button>
+            ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide border-b border-gray-100">

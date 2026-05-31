@@ -12,13 +12,14 @@ import {
 import { useAppContext } from '../context/AppContext';
 
 const Navbar = () => {
-  const { user, logout, setShowUserLogin, getCartCount } = useAppContext();
+  const { user, logout, setShowUserLogin, getCartCount, setSearchQuery: setGlobalSearchQuery } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
 
   const displayUser = user && !user.isStaff ? user : null;
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const dropdownRef = useRef(null);
@@ -35,8 +36,11 @@ const Navbar = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+    const query = searchQuery.trim();
+    if (query) {
+      setGlobalSearchQuery(query);
+      setMobileSearchOpen(false);
+      navigate('/products');
     }
   };
 
@@ -86,7 +90,7 @@ const Navbar = () => {
           style={{ backgroundColor: '#1B6B3A' }}
         >
           <MapPin size={12} />
-          <span>Delivering to Kerala &amp; major Indian cities</span>
+          <span>Delivering to Ahmedabad only</span>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center gap-4">
@@ -215,7 +219,38 @@ const Navbar = () => {
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileSearchOpen((v) => !v)}
+            className="ml-auto md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 hover:text-[#1B6B3A] transition-colors"
+            aria-label="Search products"
+          >
+            <Search size={21} strokeWidth={2.2} />
+          </button>
         </div>
+
+        {mobileSearchOpen && (
+          <form onSubmit={handleSearch} className="md:hidden border-t border-gray-100 px-4 py-3 bg-white">
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+                placeholder="Search products..."
+                className="w-full rounded-full border border-gray-200 bg-gray-50 py-2.5 pl-4 pr-11 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-[#1B6B3A] focus:bg-white focus:ring-2 focus:ring-[#1B6B3A]/20"
+              />
+              <button
+                type="submit"
+                className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#1B6B3A] text-white"
+                aria-label="Submit search"
+              >
+                <Search size={16} />
+              </button>
+            </div>
+          </form>
+        )}
       </header>
 
       <div className="hidden md:block h-[72px]" />

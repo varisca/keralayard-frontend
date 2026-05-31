@@ -203,7 +203,7 @@ const AddAddress = () => {
                 id="fullName"
                 name="fullName"
                 type="text"
-                placeholder="e.g. Priya Menon"
+                placeholder="Full Name"
                 value={form.fullName}
                 onChange={handleChange}
                 required

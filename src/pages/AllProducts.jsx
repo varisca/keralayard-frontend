@@ -68,8 +68,6 @@ const AllProducts = () => {
   const {
     products,
     productsLoading,
-    searchQuery,
-    setSearchQuery,
     categories,
   } = useAppContext();
 
@@ -79,7 +77,6 @@ const AllProducts = () => {
 
   const [activeCategory, setActiveCategory] = useState("all");
   const [filtered, setFiltered] = useState(sourceProducts);
-  const [localSearch, setLocalSearch] = useState(searchQuery || "");
 
   const categoryCounts = useMemo(() => {
     const counts = { all: 0 };
@@ -97,37 +94,13 @@ const AllProducts = () => {
   }, [activeCategories, sourceProducts]);
 
   useEffect(() => {
-    setLocalSearch(searchQuery || "");
-  }, [searchQuery]);
-
-  useEffect(() => {
     let result = sourceProducts.filter(isVisibleProduct);
     const categoryObj = activeCategories.find((c) => c.id === activeCategory);
-
     if (categoryObj) {
       result = result.filter((p) => productMatchesCategory(p, categoryObj));
     }
-
-    if (localSearch.trim()) {
-      const q = normalise(localSearch);
-      result = result.filter(
-        (p) =>
-          normalise(p.name).includes(q) ||
-          normalise(p.categoryName).includes(q) ||
-          normalise(p.category).includes(q) ||
-          normalise(p.description).includes(q) ||
-          p.tags?.some((tag) => normalise(tag).includes(q))
-      );
-    }
-
     setFiltered(result);
-  }, [sourceProducts, activeCategories, activeCategory, localSearch]);
-
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setLocalSearch(value);
-    setSearchQuery(value);
-  };
+  }, [sourceProducts, activeCategories, activeCategory]);
 
   const selectedCategory = activeCategories.find((c) => c.id === activeCategory);
 
@@ -140,7 +113,7 @@ const AllProducts = () => {
       />
 
       <div className="max-w-7xl mx-auto">
-        <div className="px-4 sm:px-6 lg:px-8 pt-6 md:pt-0 pb-5">
+        <div className="hidden md:block px-4 sm:px-6 lg:px-8 pt-6 md:pt-0 pb-5">
           <h1 className="text-2xl md:text-4xl font-bold text-dark">
             All Kerala Products
           </h1>
@@ -149,41 +122,6 @@ const AllProducts = () => {
           </p>
           <div className="w-16 h-1 bg-primary rounded-full mt-3" />
 
-          <div className="relative mt-6 max-w-xl">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              value={localSearch}
-              onChange={handleSearchChange}
-              placeholder="Search products, categories, tags..."
-              className="w-full pl-10 pr-10 py-3 rounded-xl border border-gray-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition"
-            />
-            {localSearch && (
-              <button
-                onClick={() => {
-                  setLocalSearch("");
-                  setSearchQuery("");
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                aria-label="Clear search"
-              >
-                x
-              </button>
-            )}
-          </div>
         </div>
 
         <div className="grid grid-cols-[92px_minmax(0,1fr)] md:grid-cols-[220px_minmax(0,1fr)] border-t border-gray-200 bg-white md:rounded-2xl md:border md:shadow-sm md:mx-6 lg:mx-8">
@@ -191,32 +129,30 @@ const AllProducts = () => {
             <div className="sticky top-0 md:top-24 max-h-[calc(100vh-88px)] overflow-y-auto">
               <button
                 onClick={() => setActiveCategory("all")}
-                className={`w-full min-h-[78px] md:min-h-0 md:py-4 px-2 md:px-4 flex flex-col md:flex-row items-center md:items-start justify-center md:justify-between gap-1 md:gap-3 text-center md:text-left border-b border-gray-200 transition ${
+                className={`w-full min-h-[52px] md:min-h-0 md:py-4 px-3 md:px-4 flex flex-row items-center justify-between gap-2 border-b border-gray-200 transition ${
                   activeCategory === "all"
                     ? "bg-white text-primary border-l-4 border-l-primary"
                     : "text-gray-600 hover:bg-white"
                 }`}
               >
-                <span className="text-lg md:hidden">All</span>
                 <span className="text-xs md:text-sm font-semibold leading-tight">All</span>
-                <span className="hidden md:inline text-xs text-gray-400">{categoryCounts.all || 0}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{categoryCounts.all || 0}</span>
               </button>
 
               {activeCategories.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`w-full min-h-[86px] md:min-h-0 md:py-4 px-2 md:px-4 flex flex-col md:flex-row items-center md:items-start justify-center md:justify-between gap-1 md:gap-3 text-center md:text-left border-b border-gray-200 transition ${
+                  className={`w-full min-h-[52px] md:min-h-0 md:py-4 px-3 md:px-4 flex flex-row items-center justify-between gap-2 border-b border-gray-200 transition ${
                     activeCategory === cat.id
                       ? "bg-white text-primary border-l-4 border-l-primary"
                       : "text-gray-600 hover:bg-white"
                   }`}
                 >
-                  <span className="text-xl leading-none">{cat.icon || ""}</span>
-                  <span className="flex-1 text-[11px] md:text-sm font-semibold leading-tight line-clamp-2">
+                  <span className="flex-1 text-[11px] md:text-sm font-semibold leading-tight text-left line-clamp-2">
                     {cat.name}
                   </span>
-                  <span className="hidden md:inline text-xs text-gray-400">
+                  <span className="text-xs text-gray-400 flex-shrink-0">
                     {categoryCounts[cat.id] || 0}
                   </span>
                 </button>
@@ -246,22 +182,17 @@ const AllProducts = () => {
 
             {!productsLoading && filtered.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                <span className="text-5xl mb-4">{selectedCategory?.icon || ""}</span>
                 <h3 className="text-lg font-semibold text-dark mb-2">
                   No products found
                 </h3>
                 <p className="text-gray-500 text-sm mb-6 max-w-xs">
-                  Try another category or clear your search.
+                  Try another category.
                 </p>
                 <button
-                  onClick={() => {
-                    setLocalSearch("");
-                    setSearchQuery("");
-                    setActiveCategory("all");
-                  }}
+                  onClick={() => setActiveCategory("all")}
                   className="btn-primary px-6 py-2.5 text-sm"
                 >
-                  Clear filters
+                  Show all
                 </button>
               </div>
             )}

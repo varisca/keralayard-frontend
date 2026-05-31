@@ -249,7 +249,73 @@ const Products = () => {
             <p className="text-sm">Try adjusting your search or filter</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden divide-y divide-gray-100">
+            {paginated.map((product) => (
+              <div key={product.id} className="p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {product.images?.[0] ? (
+                      <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xl">🛍️</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-gray-900 leading-tight">{product.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">{product.categoryName} · {product.weight}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <p className="font-bold text-[#1B6B3A]">{formatINR(product.sellingPrice)}</p>
+                      <p className="text-xs text-gray-400 line-through">{formatINR(product.mrp)}</p>
+                    </div>
+                  </div>
+                  {!isEmployee ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => navigate(`/admin/products/edit/${product.id}`)}
+                        className="p-2 rounded-xl text-gray-500 bg-gray-50 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        title="Edit"
+                      >
+                        <Edit size={15} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget({ id: product.id, name: product.name })}
+                        className="p-2 rounded-xl text-gray-500 bg-gray-50 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-xl bg-gray-50 p-2">
+                    <p className="text-gray-400 font-bold uppercase">Stock</p>
+                    <p className={`font-bold mt-1 ${
+                      product.stock === 0 ? "text-red-700" : product.stock < 10 ? "text-orange-700" : "text-green-700"
+                    }`}>
+                      {product.stock === 0 ? "Out" : product.stock}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 p-2">
+                    <p className="text-gray-400 font-bold uppercase">Featured</p>
+                    <div className="mt-1">
+                      <Toggle checked={product.featured} onChange={() => toggleFeatured(product.id)} activeColor="#D4A017" />
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 p-2">
+                    <p className="text-gray-400 font-bold uppercase">Active</p>
+                    <div className="mt-1">
+                      <Toggle checked={product.active} onChange={() => toggleActive(product.id)} activeColor="#1B6B3A" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide border-b border-gray-100">
@@ -392,17 +458,18 @@ const Products = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-            <p className="text-sm text-gray-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-t border-gray-100">
+            <p className="text-sm text-gray-500 text-center sm:text-left">
               Showing {(currentPage - 1) * PAGE_SIZE + 1}–
               {Math.min(currentPage * PAGE_SIZE, filtered.length)} of{" "}
               {filtered.length}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center gap-2 overflow-x-auto no-scrollbar">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}

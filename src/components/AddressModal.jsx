@@ -21,7 +21,7 @@ const initialForm = {
   addressLine2: "",
   landmark: "",
   city: "",
-  state: "Kerala",
+  state: "Gujarat",
   pincode: "",
   isDefault: false,
 };
@@ -32,7 +32,17 @@ const AddressModal = ({ isOpen, onClose, onSuccess, editAddressId, userId }) => 
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // ── Load existing address if editing ────────────────────────────────────
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
   useEffect(() => {
     if (!isOpen) return;
     if (!editAddressId) {
@@ -159,8 +169,10 @@ const AddressModal = ({ isOpen, onClose, onSuccess, editAddressId, userId }) => 
       {/* Background dismiss */}
       <div className="absolute inset-0 cursor-pointer" onClick={onClose} />
 
-      {/* Modal box */}
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-scale-in border border-gray-100 max-h-[90vh] flex flex-col">
+      {/* Modal box — sits above the mobile bottom nav bar */}
+      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-scale-in border border-gray-100 flex flex-col"
+        style={{ maxHeight: 'calc(100svh - 80px)' }}
+      >
         {/* Header */}
         <div className="px-6 py-4 bg-primary text-white flex items-center justify-between flex-shrink-0">
           <div>
@@ -191,7 +203,8 @@ const AddressModal = ({ isOpen, onClose, onSuccess, editAddressId, userId }) => 
             <p className="text-xs">Loading address details…</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+          <>
+          <form id="address-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 overscroll-contain">
             {/* Contact Detail Section */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1 flex items-center gap-1">
@@ -205,7 +218,7 @@ const AddressModal = ({ isOpen, onClose, onSuccess, editAddressId, userId }) => 
                 <input
                   name="fullName"
                   type="text"
-                  placeholder="e.g. Priya Menon"
+                  placeholder="Full Name"
                   value={form.fullName}
                   onChange={handleChange}
                   required
@@ -302,7 +315,7 @@ const AddressModal = ({ isOpen, onClose, onSuccess, editAddressId, userId }) => 
                   <input
                     name="city"
                     type="text"
-                    placeholder="e.g. Kochi"
+                    placeholder="Ahmedabad"
                     value={form.city}
                     onChange={handleChange}
                     required
@@ -320,7 +333,7 @@ const AddressModal = ({ isOpen, onClose, onSuccess, editAddressId, userId }) => 
                   <input
                     name="pincode"
                     type="text"
-                    placeholder="682001"
+                    placeholder=""
                     value={form.pincode}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "").slice(0, 6);
@@ -383,24 +396,29 @@ const AddressModal = ({ isOpen, onClose, onSuccess, editAddressId, userId }) => 
               </label>
             </div>
 
-            {/* Action buttons */}
-            <div className="flex gap-3 pt-4 border-t border-gray-100 flex-shrink-0">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-500 font-semibold hover:bg-gray-50 transition-colors text-sm cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary/95 transition-all text-sm cursor-pointer disabled:opacity-60"
-              >
-                {saving ? "Saving..." : editAddressId ? "Update Address 🏠" : "Save Address 🏠"}
-              </button>
-            </div>
+            {/* Action buttons — moved to sticky footer below */}
+            <div className="pb-2" />
           </form>
+
+          {/* Sticky footer - always visible above mobile nav */}
+          <div className="flex-shrink-0 flex gap-3 px-6 py-4 border-t border-gray-100 bg-white">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-500 font-semibold hover:bg-gray-50 transition-colors text-sm cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="address-form"
+              disabled={saving}
+              className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary/95 transition-all text-sm cursor-pointer disabled:opacity-60"
+            >
+              {saving ? "Saving..." : editAddressId ? "Update Address" : "Save Address"}
+            </button>
+          </div>
+          </>
         )}
       </div>
     </div>

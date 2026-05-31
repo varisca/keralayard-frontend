@@ -269,7 +269,74 @@ const Staff = () => {
         </div>
       ) : (
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="md:hidden divide-y divide-gray-100">
+            {filteredStaff.map((member) => (
+              <div key={member.id} className="p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-full bg-[#1B6B3A]/10 text-[#1B6B3A] flex items-center justify-center font-bold text-sm border border-green-100 shadow-sm flex-shrink-0">
+                    {member.name ? member.name[0].toUpperCase() : "U"}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-gray-900 truncate">
+                      {member.name}
+                      {member.email === user?.email && (
+                        <span className="ml-1.5 text-[10px] bg-green-100 text-green-800 font-bold px-1.5 py-0.5 rounded-full">
+                          YOU
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{member.email}</p>
+                    <div className="mt-2">
+                      <RoleBadge role={member.role || "employee"} />
+                    </div>
+                  </div>
+                  {!isEmployee ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditModal(member)}
+                        className="p-2 rounded-xl text-gray-500 bg-gray-50 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        title="Edit credentials"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(member)}
+                        disabled={member.email === user?.email}
+                        className="p-2 rounded-xl text-gray-500 bg-gray-50 hover:text-red-600 hover:bg-red-50 disabled:opacity-30 transition-colors"
+                        title="Delete user account"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-gray-50 p-2">
+                    <p className="text-gray-400 font-bold uppercase">Password</p>
+                    <p className="font-mono text-gray-700 truncate mt-1">
+                      {isEmployee ? "••••••••" : member.password}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 p-2">
+                    <p className="text-gray-400 font-bold uppercase">Status</p>
+                    <button
+                      onClick={() => handleToggleActive(member)}
+                      disabled={isEmployee}
+                      className={`mt-1 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${
+                        member.active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      } disabled:opacity-90 disabled:cursor-not-allowed`}
+                    >
+                      {member.active ? <UserCheck size={11} /> : <UserX size={11} />}
+                      {member.active ? "Active" : "Suspended"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide border-b border-gray-100">
@@ -379,7 +446,7 @@ const Staff = () => {
       {/* ── Add/Edit Staff Modal ── */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up border border-gray-100">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden animate-fade-in-up border border-gray-100 flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-bold text-gray-800 text-lg">
@@ -394,7 +461,7 @@ const Staff = () => {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+            <form onSubmit={handleSave} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               {/* Full Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-500 uppercase block">

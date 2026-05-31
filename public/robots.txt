@@ -5,3 +5,5 @@ Disallow: /checkout
 Disallow: /my-orders
 Disallow: /profile
 Disallow: /add-address
+
+Sitemap: https://keralayard.com/sitemap.xml

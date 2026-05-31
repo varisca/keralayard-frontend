@@ -195,14 +195,6 @@ const AdminLayout = () => {
         <SidebarContent onLinkClick={undefined} />
       </aside>
 
-      {/* ── Mobile Sidebar (icon-only, w-16) ── */}
-      <aside
-        className="flex md:hidden flex-col w-16 flex-shrink-0"
-        style={{ backgroundColor: SIDEBAR_BG }}
-      >
-        <SidebarContent onLinkClick={() => setMobileSidebarOpen(false)} />
-      </aside>
-
       {/* ── Mobile Overlay Sidebar ── */}
       {mobileSidebarOpen && (
         <>
@@ -283,7 +275,7 @@ const AdminLayout = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50">
+        <main className="flex-1 overflow-y-auto bg-gray-50 pb-6">
           <Outlet />
         </main>
       </div>
