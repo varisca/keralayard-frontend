@@ -86,7 +86,7 @@ const Navbar = () => {
     <>
       <header className="sticky md:fixed top-0 inset-x-0 z-40 bg-white shadow-sm">
         <div
-          className="hidden md:flex items-center gap-1.5 px-6 py-1 text-xs text-white"
+          className="flex items-center gap-1.5 px-6 py-1 text-xs text-white"
           style={{ backgroundColor: '#1B6B3A' }}
         >
           <MapPin size={12} />
