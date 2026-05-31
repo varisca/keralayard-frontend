@@ -150,28 +150,16 @@ export const AppContextProvider = ({ children }) => {
   // ── Categories Sync ───────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "categories"), async (snapshot) => {
-      if (snapshot.empty) {
-        // Seed categories
-        console.log("Seeding categories into Firestore...");
-        try {
-          const { categories: staticCategories } = await import("../assets/keralaData");
-          setCategories(staticCategories);
-          setCategoriesLoading(false);
-          for (const c of staticCategories) {
-            await setDoc(doc(db, "categories", c.id), c);
-          }
-        } catch (err) {
-          console.error("Error seeding categories:", err);
-        }
-      } else {
+      if (!snapshot.empty) {
         const catList = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
           catList.push({ ...data, id: data.id || doc.id, docId: doc.id });
         });
         setCategories(catList);
-        setCategoriesLoading(false);
       }
+      // If empty, leave categories as [] — pages fall back to staticCategories for display only
+      setCategoriesLoading(false);
     }, (error) => {
       console.warn("Categories sync failed, using static fallback:", error);
       const loadFallback = async () => {
@@ -190,28 +178,17 @@ export const AppContextProvider = ({ children }) => {
 
   // ── Products Sync ──────────────────────────────────────────────────────────
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "products"), async (snapshot) => {
-      if (snapshot.empty) {
-        // Seed products
-        console.log("Seeding products into Firestore...");
-        setProducts(dummyProducts);
-        setProductsLoading(false);
-        try {
-          for (const p of dummyProducts) {
-            await setDoc(doc(db, "products", p.id), p);
-          }
-        } catch (err) {
-          console.error("Error seeding products:", err);
-        }
-      } else {
+    const unsub = onSnapshot(collection(db, "products"), (snapshot) => {
+      if (!snapshot.empty) {
         const prodList = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
           prodList.push({ ...data, id: data.id || doc.id, docId: doc.id });
         });
         setProducts(prodList);
-        setProductsLoading(false);
       }
+      // If empty, leave products as [] — pages fall back to dummyProducts for display only
+      setProductsLoading(false);
     }, (error) => {
       console.warn("Products sync failed, using dummy fallback:", error);
       setProducts(dummyProducts);

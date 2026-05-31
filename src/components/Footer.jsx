@@ -17,9 +17,9 @@ const Footer = () => {
   const customerCare = [
     { label: 'My Account', to: '/profile' },
     { label: 'My Orders', to: '/my-orders' },
-    { label: 'Return Policy', to: '/returns' },
-    { label: 'Privacy Policy', to: '/privacy' },
-    { label: 'Terms & Conditions', to: '/terms' },
+    // { label: 'Return Policy', to: '/returns' },
+    // { label: 'Privacy Policy', to: '/privacy' },
+    // { label: 'Terms & Conditions', to: '/terms' },
   ];
 
   return (
