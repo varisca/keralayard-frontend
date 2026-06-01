@@ -28,7 +28,7 @@ const Categories = () => {
 
       {/* Mobile: horizontal scroll strip | Desktop: grid */}
       <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 md:pb-0 md:grid md:grid-cols-4 lg:grid-cols-8 md:gap-4">
-        {categories.map((category) => (
+        {categories.filter((c) => c.active !== false).map((category) => (
           <button
             key={category.id}
             onClick={() => navigate(`/products/${category.slug}`)}

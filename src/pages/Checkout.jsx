@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
-import { dummyProducts } from "../assets/keralaData";
+
 import { db, auth } from "../firebase/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import toast from "react-hot-toast";
 import AddressModal from "../components/AddressModal";
-
-const WHATSAPP_BUSINESS_NUMBER = "918866860624";
 
 const PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%23F0F4F0'/%3E%3Ctext x='40' y='44' font-size='28' text-anchor='middle' fill='%231B6B3A'%3E🌿%3C/text%3E%3C/svg%3E";
 
@@ -47,7 +45,7 @@ const Breadcrumb = ({ step }) => {
 };
 
 // ─── Order confirmed state ─────────────────────────────────────────────────
-const OrderSuccess = ({ orderNumber, onContinue, whatsappUrl }) => (
+const OrderSuccess = ({ orderNumber, onContinue }) => (
   <div className="flex flex-col items-center justify-center py-20 px-4 animate-fade-in">
     {/* Checkmark animation */}
     <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mb-6 animate-scale-in">
@@ -68,19 +66,9 @@ const OrderSuccess = ({ orderNumber, onContinue, whatsappUrl }) => (
       package arrives. We'll send updates to your email.
     </p>
     <div className="flex gap-4 flex-wrap justify-center">
-      {whatsappUrl && (
-        <a
-          href={whatsappUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="px-8 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition"
-        >
-          Send Order on WhatsApp
-        </a>
-      )}
       <button
         onClick={() => onContinue("orders")}
-        className="btn-primary px-8 py-3 rounded-xl"
+        className="btn-primary px-8 py-3 rounded-xl animate-bounce-soft"
       >
         View My Orders
       </button>
@@ -107,7 +95,7 @@ const Checkout = () => {
 
   const displayUser = user && !user.isStaff ? user : null;
 
-  const allProducts = products.length > 0 ? products : dummyProducts;
+  const allProducts = products || [];
 
   // ── Cart array ─────────────────────────────────────────────────────────────
   const cartArray = Object.entries(cartItems)
@@ -128,7 +116,6 @@ const Checkout = () => {
   const [placing, setPlacing] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
-  const [whatsappUrl, setWhatsappUrl] = useState("");
 
   useEffect(() => {
     if (confirmed) {
@@ -180,34 +167,7 @@ const Checkout = () => {
   const tax = Math.round(subtotal * 0.02 * 100) / 100;
   const total = Math.round((subtotal + deliveryCharge) * 100) / 100;
 
-  const buildWhatsAppOrderUrl = (localId) => {
-    const itemLines = cartArray
-      .map((item) => {
-        const lineTotal = (item.sellingPrice || 0) * item.quantity;
-        return `- ${item.name} x ${item.quantity} = ${currency}${lineTotal}`;
-      })
-      .join("\n");
 
-    const message = [
-      "New Kerala Yard Order",
-      `Order No: #${localId}`,
-      "",
-      `Customer: ${selectedAddress?.fullName || auth.currentUser?.displayName || "Customer"}`,
-      `Phone: ${selectedAddress?.phone || "Not provided"}`,
-      `Email: ${auth.currentUser?.email || "Not provided"}`,
-      `Address: ${formatAddress(selectedAddress)}`,
-      "",
-      "Items:",
-      itemLines,
-      "",
-      `Subtotal: ${currency}${subtotal}`,
-      `Delivery: ${deliveryCharge === 0 ? "FREE" : `${currency}${deliveryCharge}`}`,
-      `Total: ${currency}${total}`,
-      "Payment: Cash on Delivery",
-    ].join("\n");
-
-    return `https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent(message)}`;
-  };
 
   // ── Place order ────────────────────────────────────────────────────────────
   const handlePlaceOrder = async () => {
@@ -252,12 +212,9 @@ const Checkout = () => {
         updatedAt: new Date().toISOString(),
       };
       await fsSetDoc(fsDoc(db, "orders", customOrderId), payload);
-      const nextWhatsappUrl = buildWhatsAppOrderUrl(localId);
       setOrderNumber(localId);
-      setWhatsappUrl(nextWhatsappUrl);
       clearCart();
       setConfirmed(true);
-      window.open(nextWhatsappUrl, "_blank", "noopener,noreferrer");
       toast.success("Order placed successfully! 🎉", {
         duration: 4000,
         style: { background: "#1B6B3A", color: "#fff", borderRadius: "12px" },
@@ -297,7 +254,6 @@ const Checkout = () => {
         <OrderSuccess
           orderNumber={orderNumber}
           onContinue={handleContinue}
-          whatsappUrl={whatsappUrl}
         />
       </div>
     );

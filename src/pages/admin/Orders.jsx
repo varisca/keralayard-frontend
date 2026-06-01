@@ -14,7 +14,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import toast from "react-hot-toast";
 
@@ -98,25 +98,67 @@ const Orders = () => {
     const previousSelectedOrder = selectedOrder;
     const updatedAt = new Date().toISOString();
 
+    const orderToUpdate = orders.find((o) => o.id === orderId);
+    if (!orderToUpdate) return;
+
+    // Only decrement stock when transitioning to delivered AND if we haven't done it yet
+    const isDeliveringNow = nextStatus === "delivered" && !orderToUpdate.stockDecremented;
+
     setUpdatingStatus(true);
 
     setOrders((prevOrders) =>
       prevOrders.map((o) =>
         o.id === orderId
-          ? { ...o, status: nextStatus, updatedAt }
+          ? {
+              ...o,
+              status: nextStatus,
+              updatedAt,
+              ...(isDeliveringNow ? { stockDecremented: true } : {}),
+            }
           : o
       )
     );
     if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => ({ ...prev, status: nextStatus, updatedAt }));
+      setSelectedOrder((prev) => ({
+        ...prev,
+        status: nextStatus,
+        updatedAt,
+        ...(isDeliveringNow ? { stockDecremented: true } : {}),
+      }));
     }
 
     try {
-      await updateDoc(doc(db, "orders", orderId), {
-        status: nextStatus,
-        updatedAt,
-      });
-      toast.success(`Order status updated to "${nextStatus.replace(/-/g, " ")}"`);
+      if (isDeliveringNow) {
+        const batch = writeBatch(db);
+
+        // Update order status and set stockDecremented: true
+        batch.update(doc(db, "orders", orderId), {
+          status: nextStatus,
+          stockDecremented: true,
+          updatedAt,
+        });
+
+        // Decrement stock for each item in the order
+        if (orderToUpdate.items && Array.isArray(orderToUpdate.items)) {
+          for (const item of orderToUpdate.items) {
+            if (item.id) {
+              const productRef = doc(db, "products", item.id);
+              batch.update(productRef, {
+                stock: increment(-Number(item.qty || 0)),
+              });
+            }
+          }
+        }
+
+        await batch.commit();
+        toast.success("Order marked as delivered and product stock updated! 🎉");
+      } else {
+        await updateDoc(doc(db, "orders", orderId), {
+          status: nextStatus,
+          updatedAt,
+        });
+        toast.success(`Order status updated to "${nextStatus.replace(/-/g, " ")}"`);
+      }
     } catch (err) {
       console.error("Firestore updateDoc status error:", err);
       setOrders(previousOrders);

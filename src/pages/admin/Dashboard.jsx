@@ -14,7 +14,6 @@ import {
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { useAppContext } from "../../context/AppContext";
-import { dummyProducts, dummyOrders } from "../../assets/keralaData";
 
 // ─────────────────────────────────────────────────────────────
 // Helper: format INR
@@ -94,7 +93,7 @@ const Dashboard = () => {
       },
       (error) => {
         console.warn("Orders sync failed for dashboard:", error);
-        setOrders(dummyOrders);
+        setOrders([]);
       }
     );
 
@@ -121,33 +120,29 @@ const Dashboard = () => {
     };
   }, []);
 
-  const totalOrders = orders.length > 0 ? orders.length : dummyOrders.length;
-  
-  // Calculate total revenue from orders
+  const totalOrders = orders.length;
+
+  // Calculate total revenue from real orders only
   const totalRevenue = useMemo(() => {
-    const targetOrders = orders.length > 0 ? orders : dummyOrders;
-    return targetOrders
+    return orders
       .filter((o) => o.paymentStatus === "paid" || o.status === "delivered")
       .reduce((sum, o) => sum + (o.amount || 0), 0);
   }, [orders]);
 
   const pendingOrders = useMemo(() => {
-    const targetOrders = orders.length > 0 ? orders : dummyOrders;
-    return targetOrders.filter(
+    return orders.filter(
       (o) => o.status !== "delivered" && o.status !== "cancelled"
     ).length;
   }, [orders]);
 
-  const totalCustomers = users.length > 0 ? users.length : 24;
+  const totalCustomers = users.length;
 
   const lowStockProducts = useMemo(() => {
-    const targetProds = products.length > 0 ? products : dummyProducts;
-    return targetProds.filter((p) => p.stock < 10);
+    return products.filter((p) => p.stock !== undefined && p.stock < 10);
   }, [products]);
 
   const recentOrders = useMemo(() => {
-    const targetOrders = orders.length > 0 ? orders : dummyOrders;
-    return [...targetOrders]
+    return [...orders]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 5);
   }, [orders]);
@@ -324,21 +319,19 @@ const Dashboard = () => {
         {[
           {
             label: "Products",
-            value: products.length > 0 ? products.length : dummyProducts.length,
+            value: products.length,
             icon: Package,
             path: "/admin/products",
           },
           {
             label: "Categories",
-            value: categories.length > 0 ? categories.length : 8,
+            value: categories.length,
             icon: TrendingUp,
             path: "/admin/categories",
           },
           {
             label: "Delivered",
-            value: orders.length > 0 
-              ? orders.filter((o) => o.status === "delivered").length 
-              : dummyOrders.filter((o) => o.status === "delivered").length,
+            value: orders.filter((o) => o.status === "delivered").length,
             icon: CheckCircle2,
             path: "/admin/orders",
           },

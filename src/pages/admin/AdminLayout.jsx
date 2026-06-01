@@ -95,7 +95,7 @@ const AdminLayout = () => {
         >
           🌿
         </div>
-        <div className="hidden md:block">
+        <div>
           <p className="text-white font-bold text-sm leading-tight">
             Kerala Yard
           </p>
@@ -134,11 +134,11 @@ const AdminLayout = () => {
                   size: 18,
                   className: `flex-shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-white"}`,
                 })}
-                <span className="hidden md:block text-sm">{label}</span>
+                <span className="text-sm">{label}</span>
                 {isActive && (
                   <ChevronRight
                     size={14}
-                    className="hidden md:block ml-auto text-white/60"
+                    className="ml-auto text-white/60"
                   />
                 )}
                 {/* Tooltip for icon-only mobile */}
@@ -174,7 +174,7 @@ const AdminLayout = () => {
               {initials}
             </div>
           )}
-          <div className="hidden md:block min-w-0">
+          <div className="min-w-0">
             <p className="text-white text-xs font-medium truncate">
               {displayName}
             </p>

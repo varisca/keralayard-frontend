@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -76,6 +76,74 @@ const ConfirmDialog = ({ isOpen, productName, onConfirm, onCancel }) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// Inline Stock Editor Component
+// ─────────────────────────────────────────────────────────────
+const InlineStockEditor = ({ product, isEmployee }) => {
+  const [val, setVal] = useState(product.stock || 0);
+  const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    setVal(product.stock || 0);
+  }, [product.stock]);
+
+  const handleUpdate = async (newStock) => {
+    if (isEmployee) return;
+    const stockNum = Math.max(0, parseInt(newStock, 10) || 0);
+    setVal(stockNum);
+    
+    if (stockNum === product.stock) return;
+
+    setUpdating(true);
+    try {
+      await updateDoc(doc(db, "products", product.id), { stock: stockNum });
+      toast.success(`Stock updated for ${product.name}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update stock");
+      setVal(product.stock || 0);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1 justify-center md:justify-start animate-fade-in" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        disabled={updating || isEmployee || val <= 0}
+        onClick={() => handleUpdate(val - 1)}
+        className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-40 flex items-center justify-center font-bold text-xs cursor-pointer focus:outline-none transition-colors"
+      >
+        –
+      </button>
+      <input
+        type="number"
+        disabled={updating || isEmployee}
+        value={val}
+        min="0"
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => handleUpdate(val)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            handleUpdate(val);
+            e.target.blur();
+          }
+        }}
+        className="w-12 text-center text-xs border border-gray-200 rounded py-1 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-semibold text-gray-700 bg-white"
+      />
+      <button
+        type="button"
+        disabled={updating || isEmployee}
+        onClick={() => handleUpdate(val + 1)}
+        className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-40 flex items-center justify-center font-bold text-xs cursor-pointer focus:outline-none transition-colors"
+      >
+        +
+      </button>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
 // Products Page
 // ─────────────────────────────────────────────────────────────
 const Products = () => {
@@ -84,6 +152,7 @@ const Products = () => {
   const isEmployee = user?.role === "employee";
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [stockFilter, setStockFilter] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 8;
@@ -96,9 +165,19 @@ const Products = () => {
         p.categoryName.toLowerCase().includes(search.toLowerCase());
       const matchCat =
         categoryFilter === "all" || p.categoryId === categoryFilter;
-      return matchSearch && matchCat;
+      
+      let matchStock = true;
+      if (stockFilter === "inStock") {
+        matchStock = p.stock > 0;
+      } else if (stockFilter === "lowStock") {
+        matchStock = p.stock > 0 && p.stock <= 10;
+      } else if (stockFilter === "outOfStock") {
+        matchStock = p.stock === 0;
+      }
+
+      return matchSearch && matchCat && matchStock;
     });
-  }, [products, search, categoryFilter]);
+  }, [products, search, categoryFilter, stockFilter]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(
@@ -238,6 +317,27 @@ const Products = () => {
             ))}
           </select>
         </div>
+
+        {/* Stock Filter */}
+        <div className="relative">
+          <Package
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <select
+            value={stockFilter}
+            onChange={(e) => {
+              setStockFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white appearance-none cursor-pointer"
+          >
+            <option value="all">All Stock Levels</option>
+            <option value="inStock">In Stock Only</option>
+            <option value="lowStock">Low Stock (≤10)</option>
+            <option value="outOfStock">Out of Stock</option>
+          </select>
+        </div>
       </div>
 
       {/* Products Table */}
@@ -290,13 +390,11 @@ const Products = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="rounded-xl bg-gray-50 p-2">
-                    <p className="text-gray-400 font-bold uppercase">Stock</p>
-                    <p className={`font-bold mt-1 ${
-                      product.stock === 0 ? "text-red-700" : product.stock < 10 ? "text-orange-700" : "text-green-700"
-                    }`}>
-                      {product.stock === 0 ? "Out" : product.stock}
-                    </p>
+                  <div className="rounded-xl bg-gray-50 p-2 flex flex-col justify-between">
+                    <p className="text-gray-400 font-bold uppercase text-[9px]">Stock</p>
+                    <div className="mt-1">
+                      <InlineStockEditor product={product} isEmployee={isEmployee} />
+                    </div>
                   </div>
                   <div className="rounded-xl bg-gray-50 p-2">
                     <p className="text-gray-400 font-bold uppercase">Featured</p>
@@ -391,17 +489,20 @@ const Products = () => {
 
                     {/* Stock */}
                     <td className="px-4 py-3.5 hidden lg:table-cell">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          product.stock === 0
-                            ? "bg-red-100 text-red-700"
-                            : product.stock < 10
-                            ? "bg-orange-100 text-orange-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {product.stock === 0 ? "Out of stock" : `${product.stock} units`}
-                      </span>
+                      <div className="flex flex-col gap-1.5 justify-center">
+                        <InlineStockEditor product={product} isEmployee={isEmployee} />
+                        <span
+                          className={`inline-block text-[10px] font-semibold text-center w-fit px-2 py-0.5 rounded ${
+                            product.stock === 0
+                              ? "bg-red-100 text-red-700"
+                              : product.stock <= 10
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {product.stock === 0 ? "Out of stock" : product.stock <= 10 ? `Low Stock (${product.stock})` : "In Stock"}
+                        </span>
+                      </div>
                     </td>
 
                     {/* Featured Toggle */}

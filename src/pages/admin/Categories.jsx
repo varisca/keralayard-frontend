@@ -9,11 +9,29 @@ import {
   Upload,
   Loader2,
 } from "lucide-react";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { auth, db, storage } from "../../firebase/firebase";
 import { useAppContext } from "../../context/AppContext";
 import { uploadImageWithFallback } from "../../utils/imageUpload";
 import toast from "react-hot-toast";
+
+// ─────────────────────────────────────────────────────────────
+// Toggle Switch Component
+// ─────────────────────────────────────────────────────────────
+const Toggle = ({ checked, onChange, activeColor = "#1B6B3A" }) => (
+  <button
+    type="button"
+    onClick={() => onChange(!checked)}
+    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none cursor-pointer`}
+    style={{ backgroundColor: checked ? activeColor : "#D1D5DB" }}
+  >
+    <span
+      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+        checked ? "translate-x-4.5" : "translate-x-0.5"
+      }`}
+    />
+  </button>
+);
 
 // ─────────────────────────────────────────────────────────────
 // Presets for Kerala-style pastel colors
@@ -60,6 +78,7 @@ const Categories = () => {
   const [imageFile, setImageFile] = useState(null);
   const [imageUrl, setImageUrl] = useState("");
   const [selectedMeasurementOptions, setSelectedMeasurementOptions] = useState(["g", "kg"]);
+  const [active, setActive] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -88,6 +107,7 @@ const Categories = () => {
     setImageFile(null);
     setImageUrl("");
     setSelectedMeasurementOptions(["g", "kg"]);
+    setActive(true);
     setModalOpen(true);
   };
 
@@ -102,6 +122,7 @@ const Categories = () => {
     setImageFile(null);
     setImageUrl(cat.image || "");
     setSelectedMeasurementOptions(cat.measurementOptions?.length ? cat.measurementOptions : ["g", "kg"]);
+    setActive(cat.active !== undefined ? !!cat.active : true);
     setModalOpen(true);
   };
 
@@ -158,6 +179,7 @@ const Categories = () => {
         bgColor,
         image: finalImageUrl || null,
         measurementOptions: selectedMeasurementOptions,
+        active,
       };
 
       await setDoc(doc(db, "categories", categoryId), payload);
@@ -285,6 +307,28 @@ const Categories = () => {
                       </span>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* Store Visibility */}
+              <div className="flex items-center justify-between mt-3 text-xs bg-gray-50 p-2 rounded-xl relative z-10" onClick={(e) => e.stopPropagation()}>
+                <span className="text-gray-500 font-semibold uppercase">Visibility</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`font-bold ${category.active !== false ? "text-green-600" : "text-gray-400"}`}>
+                    {category.active !== false ? "Active" : "Inactive"}
+                  </span>
+                  <Toggle
+                    checked={category.active !== false}
+                    onChange={async (val) => {
+                      try {
+                        await updateDoc(doc(db, "categories", category.id), { active: val });
+                        toast.success("Category visibility updated!");
+                      } catch (err) {
+                        console.error(err);
+                        toast.error("Failed to update status");
+                      }
+                    }}
+                  />
                 </div>
               </div>
 
@@ -489,6 +533,15 @@ const Categories = () => {
                     </>
                   )}
                 </div>
+              </div>
+
+              {/* Visibility Status */}
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Active Status</p>
+                  <p className="text-xs text-gray-400">Visible on customer storefront</p>
+                </div>
+                <Toggle checked={active} onChange={setActive} activeColor="#1B6B3A" />
               </div>
 
               {/* Form Buttons */}

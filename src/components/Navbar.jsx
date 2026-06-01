@@ -18,8 +18,6 @@ const Navbar = () => {
 
   const displayUser = user && !user.isStaff ? user : null;
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const dropdownRef = useRef(null);
@@ -34,15 +32,7 @@ const Navbar = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    const query = searchQuery.trim();
-    if (query) {
-      setGlobalSearchQuery(query);
-      setMobileSearchOpen(false);
-      navigate('/products');
-    }
-  };
+
 
   const handleLogout = async () => {
     setUserDropdownOpen(false);
@@ -111,25 +101,7 @@ const Navbar = () => {
             ))}
           </nav>
 
-          <form
-            onSubmit={handleSearch}
-            className="hidden md:flex flex-1 max-w-md mx-auto"
-          >
-            <div className="relative w-full">
-              <Search
-                size={16}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search spices, coconut products..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-full bg-gray-100 text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:bg-white transition-all duration-200"
-                style={{ '--tw-ring-color': '#1B6B3A55' }}
-              />
-            </div>
-          </form>
+
 
           <div className="hidden md:flex items-center gap-3 ml-auto flex-shrink-0">
             <Link
@@ -220,37 +192,10 @@ const Navbar = () => {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setMobileSearchOpen((v) => !v)}
-            className="ml-auto md:hidden inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 hover:text-[#1B6B3A] transition-colors"
-            aria-label="Search products"
-          >
-            <Search size={21} strokeWidth={2.2} />
-          </button>
+
         </div>
 
-        {mobileSearchOpen && (
-          <form onSubmit={handleSearch} className="md:hidden border-t border-gray-100 px-4 py-3 bg-white">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                autoFocus
-                placeholder="Search products..."
-                className="w-full rounded-full border border-gray-200 bg-gray-50 py-2.5 pl-4 pr-11 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-[#1B6B3A] focus:bg-white focus:ring-2 focus:ring-[#1B6B3A]/20"
-              />
-              <button
-                type="submit"
-                className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#1B6B3A] text-white"
-                aria-label="Submit search"
-              >
-                <Search size={16} />
-              </button>
-            </div>
-          </form>
-        )}
+
       </header>
 
       <div className="hidden md:block h-[72px]" />

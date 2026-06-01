@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useAppContext } from "../context/AppContext";
-import { dummyProducts } from "../assets/keralaData";
 import { db } from "../firebase/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import toast from "react-hot-toast";
@@ -52,7 +51,7 @@ const Cart = () => {
   const displayUser = user && !user.isStaff ? user : null;
 
   // Use keralaData products as source-of-truth
-  const allProducts = products.length > 0 ? products : dummyProducts;
+  const allProducts = products || [];
 
   // ── Derived cart array ─────────────────────────────────────────────────────
   const cartArray = Object.entries(cartItems)

@@ -70,20 +70,21 @@ const ProductCard = ({ product }) => {
         className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl bg-white transition-all duration-200 hover:shadow-md"
         style={{ border: '1px solid #e9ecef' }}
       >
-        {/* Image — 300-350px tall, full width, object-cover */}
-        <div className="relative w-full overflow-hidden bg-gray-50" style={{ height: '200px' }}>
+        {/* Image — 48px height, uncropped contain, full display */}
+        <div className="relative w-full h-48 bg-gray-50 flex items-center justify-center overflow-hidden border-b border-gray-100 p-2">
           {imageUrl && !imgError ? (
             <>
               <img
                 src={imageUrl}
                 alt={name}
                 onError={() => setImgError(true)}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
                 loading="lazy"
-              />              {/* Zoom icon on hover */}
+              />
+              {/* Zoom icon on hover */}
               <button
                 onClick={(e) => { e.stopPropagation(); setLightboxOpen(true); }}
-                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/80 hover:bg-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer"
+                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/80 hover:bg-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm cursor-pointer border border-gray-200"
                 aria-label="View image"
               >
                 <svg className="w-3.5 h-3.5 text-gray-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -99,9 +100,14 @@ const ProductCard = ({ product }) => {
         </div>
 
         <div className="flex flex-1 flex-col gap-1 p-2.5">
-          {weight && (
-            <span className="text-[11px] font-medium text-gray-400">{weight}</span>
-          )}
+          <div className="flex items-center justify-between min-h-[16px]">
+            <span className="text-[11px] font-medium text-gray-400">{weight || ""}</span>
+            {product.stock === 0 ? (
+              <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">Out of Stock</span>
+            ) : product.stock <= 10 && product.stock > 0 ? (
+              <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded">Only {product.stock} left</span>
+            ) : null}
+          </div>
 
           <h3
             className="line-clamp-2 min-h-[2.1rem] flex-1 text-[13px] font-semibold leading-snug text-gray-800 md:text-sm"
@@ -115,7 +121,14 @@ const ProductCard = ({ product }) => {
           </span>
 
           <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
-            {qty === 0 ? (
+            {product.stock === 0 ? (
+              <button
+                disabled
+                className="w-full rounded-lg bg-gray-200 py-2 text-sm font-semibold text-gray-400 cursor-not-allowed text-center"
+              >
+                Out of Stock
+              </button>
+            ) : qty === 0 ? (
               <button
                 onClick={(e) => { e.stopPropagation(); addToCart(pid); }}
                 className="w-full rounded-lg bg-[#1B6B3A] py-2 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-95"

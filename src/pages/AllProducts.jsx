@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import ProductCard from "../components/ProductCard";
 import SEO from "../components/SEO";
-import { dummyProducts, categories as staticCategories } from "../assets/keralaData";
+import { Search } from "lucide-react";
 
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col gap-3 animate-pulse">
@@ -71,11 +71,15 @@ const AllProducts = () => {
     categories,
   } = useAppContext();
 
-  const sourceProducts = products && products.length > 0 ? products : dummyProducts;
-  const activeCategories =
-    categories && categories.length > 0 ? categories : staticCategories;
+  const sourceProducts = products || [];
+  
+  // Filter active categories so deactivated ones disappear
+  const activeCategories = useMemo(() => {
+    return (categories || []).filter((c) => c.active !== false);
+  }, [categories]);
 
   const [activeCategory, setActiveCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [filtered, setFiltered] = useState(sourceProducts);
 
   const categoryCounts = useMemo(() => {
@@ -99,8 +103,20 @@ const AllProducts = () => {
     if (categoryObj) {
       result = result.filter((p) => productMatchesCategory(p, categoryObj));
     }
+    
+    // Direct catalog search filtering
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.categoryName.toLowerCase().includes(q) ||
+          (p.tags && p.tags.some((t) => t.toLowerCase().includes(q)))
+      );
+    }
+    
     setFiltered(result);
-  }, [sourceProducts, activeCategories, activeCategory]);
+  }, [sourceProducts, activeCategories, activeCategory, searchQuery]);
 
   const selectedCategory = activeCategories.find((c) => c.id === activeCategory);
 
@@ -126,7 +142,7 @@ const AllProducts = () => {
 
         <div className="grid grid-cols-[92px_minmax(0,1fr)] md:grid-cols-[220px_minmax(0,1fr)] border-t border-gray-200 bg-white md:rounded-2xl md:border md:shadow-sm md:mx-6 lg:mx-8">
           <aside className="bg-gray-50 border-r border-gray-200">
-            <div className="sticky top-0 md:top-24 max-h-[calc(100vh-88px)] overflow-y-auto">
+            <div className="sticky top-[96px] md:top-24 max-h-[calc(100vh-96px-64px-env(safe-area-inset-bottom))] md:max-h-[calc(100vh-88px)] overflow-y-auto no-scrollbar">
               <button
                 onClick={() => setActiveCategory("all")}
                 className={`w-full min-h-[52px] md:min-h-0 md:py-4 px-3 md:px-4 flex flex-row items-center justify-between gap-2 border-b border-gray-200 transition ${
@@ -161,6 +177,21 @@ const AllProducts = () => {
           </aside>
 
           <main className="min-w-0 p-3 md:p-6">
+            {/* Direct Search Bar */}
+            <div className="relative mb-6 w-full max-w-md">
+              <Search
+                size={18}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              />
+              <input
+                type="text"
+                placeholder="Search spices, banana chips, coconut oil..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200"
+              />
+            </div>
+
             {!productsLoading && (
               <div className="mb-4">
                 <h2 className="text-base md:text-xl font-bold text-dark">

@@ -174,21 +174,20 @@ const ProductDetails = () => {
 
           {/* ── LEFT: Image Gallery ────────────────────────────────── */}
           <div
-  className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm"
-  style={{ height: "350px" }}
->
-  {mainImage ? (
-    <img
-      src={mainImage}
-      alt={product.name}
-      className="w-full h-full object-cover transition-all duration-300 hover:scale-105"
-    />
-  ) : (
-    <div className="flex h-full items-center justify-center">
-      ...
-    </div>
-  )}
-</div>
+            className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm flex items-center justify-center p-4 w-full h-auto max-h-[500px] md:max-h-[600px]"
+          >
+            {mainImage ? (
+              <img
+                src={mainImage}
+                alt={product.name}
+                className="max-h-[450px] md:max-h-[550px] w-auto h-auto object-contain transition-all duration-300 hover:scale-105"
+              />
+            ) : (
+              <div className="flex h-[350px] items-center justify-center text-gray-300">
+                No Image
+              </div>
+            )}
+          </div>
 
           {/* ── RIGHT: Product Info ────────────────────────────────── */}
           <div className="flex flex-col w-full md:w-7/12 lg:w-3/5">
@@ -235,21 +234,16 @@ const ProductDetails = () => {
             <div className="flex items-center gap-2 mb-5">
               <span
                 className={`inline-block w-2.5 h-2.5 rounded-full ${
-                  inStock ? "bg-green-500" : "bg-red-500"
+                  stock === 0 ? "bg-red-500" : stock <= 10 ? "bg-orange-500" : "bg-green-500"
                 }`}
               />
               <span
                 className={`text-sm font-semibold ${
-                  inStock ? "text-green-600" : "text-red-500"
+                  stock === 0 ? "text-red-500" : stock <= 10 ? "text-orange-500" : "text-green-600"
                 }`}
               >
-                {inStock ? "In Stock" : "Out of Stock"}
+                {stock === 0 ? "Out of Stock" : stock <= 10 ? `Low Stock (Only ${stock} left!)` : "In Stock"}
               </span>
-              {inStock && stock <= 10 && (
-                <span className="text-xs text-orange-500 font-medium ml-1">
-                  (Only {stock} left!)
-                </span>
-              )}
             </div>
 
             {/* Divider */}

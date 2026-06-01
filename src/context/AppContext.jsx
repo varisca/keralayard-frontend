@@ -4,7 +4,6 @@ import { auth, db, signInWithGoogle, signOutUser } from "../firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, collection } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { dummyProducts } from "../assets/keralaData";
 
 export const AppContext = createContext();
 
@@ -161,17 +160,9 @@ export const AppContextProvider = ({ children }) => {
       // If empty, leave categories as [] — pages fall back to staticCategories for display only
       setCategoriesLoading(false);
     }, (error) => {
-      console.warn("Categories sync failed, using static fallback:", error);
-      const loadFallback = async () => {
-        try {
-          const { categories: staticCategories } = await import("../assets/keralaData");
-          setCategories(staticCategories);
-        } catch (err) {
-          console.error("Error loading fallback categories:", err);
-        }
-        setCategoriesLoading(false);
-      };
-      loadFallback();
+      console.warn("Categories sync failed:", error);
+      setCategories([]);
+      setCategoriesLoading(false);
     });
     return () => unsub();
   }, []);
@@ -190,8 +181,8 @@ export const AppContextProvider = ({ children }) => {
       // If empty, leave products as [] — pages fall back to dummyProducts for display only
       setProductsLoading(false);
     }, (error) => {
-      console.warn("Products sync failed, using dummy fallback:", error);
-      setProducts(dummyProducts);
+      console.warn("Products sync failed:", error);
+      setProducts([]);
       setProductsLoading(false);
     });
     return () => unsub();

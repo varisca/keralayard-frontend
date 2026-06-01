@@ -1,7 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useAppContext } from '../context/AppContext'
-import { dummyProducts } from '../assets/keralaData'
 
 /* ─────────────────────────────────────────────────────────────────
    Inline Kerala-schema product card (works with keralaData schema)
@@ -102,8 +101,8 @@ const KeralaCard = ({ product }) => {
 const BestSeller = () => {
   const { products } = useAppContext()
 
-  // Use context products (same as dummyProducts) or fallback
-  const source = products && products.length > 0 ? products : dummyProducts
+  // Use real products from Firestore only
+  const source = products || []
   // Only show active and featured products
   const featured = source.filter((p) => p.active !== false && p.featured).slice(0, 8)
 
