@@ -1,26 +1,6 @@
 {
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.keralayard.com"
-        }
-      ],
-      "destination": "https://keralayard.com/:path*",
-      "permanent": true
-    }
-  ],
+  "cleanUrls": true,
   "rewrites": [
-    {
-      "source": "/sitemap.xml",
-      "destination": "/sitemap.xml"
-    },
-    {
-      "source": "/robots.txt",
-      "destination": "/robots.txt"
-    },
     {
       "source": "/:path*",
       "destination": "/"
