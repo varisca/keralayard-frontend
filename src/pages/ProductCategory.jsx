@@ -72,8 +72,35 @@ const ProductCategory = () => {
     "@type": "CollectionPage",
     name: `${displayName} - Kerala Yard`,
     description: seoDescription,
-    url: `${window.location.origin}/products/${categoryObj.slug || category}`,
+    url: `https://keralayard.com/products/${categoryObj.slug || category}`,
   };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://keralayard.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Products",
+        "item": "https://keralayard.com/products"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": displayName,
+        "item": `https://keralayard.com/products/${categoryObj?.slug || category}`
+      }
+    ]
+  };
+
+  const schemas = [categorySchema, breadcrumbSchema].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-warm pt-36 md:pt-40 pb-16">
@@ -81,7 +108,7 @@ const ProductCategory = () => {
         title={`${displayName} Online`}
         description={seoDescription}
         keywords={`${displayName}, Kerala ${displayName}, buy ${displayName} online, Kerala groceries online`}
-        jsonLd={categorySchema}
+        jsonLd={schemas}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 

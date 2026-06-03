@@ -97,6 +97,11 @@ const AllProducts = () => {
     return counts;
   }, [activeCategories, sourceProducts]);
 
+  // Scroll page to top when category changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeCategory]);
+
   useEffect(() => {
     let result = sourceProducts.filter(isVisibleProduct);
     const categoryObj = activeCategories.find((c) => c.id === activeCategory);
@@ -120,12 +125,32 @@ const AllProducts = () => {
 
   const selectedCategory = activeCategories.find((c) => c.id === activeCategory);
 
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://keralayard.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Products",
+        "item": "https://keralayard.com/products"
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen bg-warm pb-24 md:pt-8 md:pb-16">
       <SEO
         title="Shop Kerala Products Online"
         description="Browse Kerala Yard products online, including banana chips, coconut oil, spices, pickles, breakfast mixes, and homemade Kerala snacks."
         keywords="shop Kerala products online, Kerala groceries, banana chips online, coconut oil online, Kerala spices, Kerala snacks"
+        jsonLd={breadcrumbSchema}
       />
 
       <div className="max-w-7xl mx-auto">

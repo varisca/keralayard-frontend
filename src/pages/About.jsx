@@ -1,12 +1,32 @@
 import SEO from "../components/SEO";
 
 const About = () => {
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://keralayard.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "About Us",
+        "item": "https://keralayard.com/about"
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen bg-warm pb-20">
       <SEO
         title="About Us - The Kerala Yard Story"
         description="Kerala Yard is your direct bridge to authentic Kerala flavors in Ahmedabad. Sourced directly from Kerala, delivered to your doorstep."
         keywords="about Kerala Yard, authentic Kerala groceries Ahmedabad, Kerala products story"
+        jsonLd={breadcrumbSchema}
       />
 
       {/* Hero */}

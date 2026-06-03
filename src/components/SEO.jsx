@@ -57,7 +57,7 @@ const appendJsonLd = (schema) => {
 
 const getAbsoluteUrl = (path = "/") => {
   if (/^https?:\/\//i.test(path)) return path;
-  return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
+  return `https://keralayard.com${path.startsWith("/") ? path : `/${path}`}`;
 };
 
 const SEO = ({

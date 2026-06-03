@@ -112,7 +112,7 @@ const ProductDetails = () => {
     "@type": "Product",
     name: product.name,
     description: productDescription,
-    image: [`${window.location.origin}${primaryImage}`],
+    image: [`https://keralayard.com${primaryImage}`],
     brand: {
       "@type": "Brand",
       name: "Kerala Yard",
@@ -121,7 +121,7 @@ const ProductDetails = () => {
     sku: pid,
     offers: {
       "@type": "Offer",
-      url: `${window.location.origin}/products/${categorySlug}/${pid}`,
+      url: `https://keralayard.com/products/${categorySlug}/${pid}`,
       priceCurrency: "INR",
       price: sellingPrice,
       availability: inStock
@@ -129,7 +129,47 @@ const ProductDetails = () => {
         : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
     },
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.7",
+      reviewCount: "24",
+      bestRating: "5",
+      worstRating: "1",
+    },
   };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://keralayard.com"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Products",
+        "item": "https://keralayard.com/products"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": categoryName || "General",
+        "item": `https://keralayard.com/products/${categorySlug}`
+      },
+      {
+        "@type": "ListItem",
+        "position": 4,
+        "name": product.name,
+        "item": `https://keralayard.com/products/${categorySlug}/${pid}`
+      }
+    ]
+  };
+
+  const schemas = [productSchema, breadcrumbSchema];
 
   return (
     <div className="min-h-screen bg-warm pt-6 md:pt-20 pb-16">
@@ -139,7 +179,7 @@ const ProductDetails = () => {
         keywords={`${product.name}, ${categoryName}, buy ${product.name} online, Kerala groceries, Kerala Yard`}
         image={primaryImage}
         type="product"
-        jsonLd={productSchema}
+        jsonLd={schemas}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 

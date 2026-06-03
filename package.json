@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "prebuild": "node scripts/generate-seo-files.js",
+    "build": "npm run prebuild && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy:rules": "firebase deploy --only firestore:rules"
