@@ -25,7 +25,7 @@ const Footer = () => {
   return (
     <footer style={{ backgroundColor: '#1B6B3A' }} className="text-white pb-24 md:pb-0">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-10">
           <div className="flex flex-col gap-4">
             <Link to="/" className="inline-flex items-center">
               <span className="inline-flex items-center rounded-xl bg-white px-1 py-1">
@@ -101,6 +101,37 @@ const Footer = () => {
                   </Link>
                 </li>
               ))}
+            </ul>
+          </div>
+
+          <div>
+            <h3
+              className="text-base font-semibold mb-5 pb-2 border-b"
+              style={{ borderColor: 'rgba(212,160,23,0.5)', color: '#D4A017' }}
+            >
+              Our Team
+            </h3>
+            <ul className="space-y-3">
+              <li className="text-sm">
+                <span className="block text-white/50 text-xs">CEO</span>
+                <span className="text-white/90 font-medium">Shadow</span>
+              </li>
+              <li className="text-sm">
+                <span className="block text-white/50 text-xs">CTO</span>
+                <span className="text-white/90 font-medium">Deep Dalal</span>
+              </li>
+              <li className="text-sm">
+                <span className="block text-white/50 text-xs">Lead Developer</span>
+                <span className="text-white/90 font-medium">Lawrence Nadar</span>
+              </li>
+              <li className="text-sm">
+                <span className="block text-white/50 text-xs">Marketing</span>
+                <span className="text-white/90 font-medium">Dev Rathod</span>
+              </li>
+              <li className="text-sm">
+                <span className="block text-white/50 text-xs">Customer Relation</span>
+                <span className="text-white/90 font-medium">Anu Alex</span>
+              </li>
             </ul>
           </div>
 
